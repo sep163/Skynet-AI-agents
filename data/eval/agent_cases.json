@@ -1,0 +1,9 @@
+[
+  {"id": "blocked", "client": "c001", "faults": [], "minutes": 1, "message": "Не работает интернет с утра", "expect_tools": ["get_balance"], "forbid_tools": ["book_technician_visit"], "expect_answer": "обещанн"},
+  {"id": "cable_before_complaint", "client": "c002", "faults": [["cable_degradation", "sw-01/5"]], "minutes": 20, "message": "Интернет иногда пропадает на пару секунд, видео подвисает", "expect_tools": ["get_network_incidents|get_line_diagnostics"], "forbid_tools": [], "expect_answer": "мастер|выезд"},
+  {"id": "router_wan_100", "client": "c002", "faults": [["speed_downgrade", "sw-01/5"]], "minutes": 5, "message": "Плачу за гигабит, а спидтест по кабелю показывает 94 мегабита", "expect_tools": ["get_line_diagnostics", "get_client_profile"], "forbid_tools": ["book_technician_visit"], "expect_answer": "роутер"},
+  {"id": "switch_outage", "client": "c004", "faults": [["switch_power", "sw-04"]], "minutes": 5, "message": "Интернета нет вообще, роутер перезагружал", "expect_tools": ["get_network_incidents"], "forbid_tools": ["restart_session", "book_technician_visit"], "expect_answer": "авари"},
+  {"id": "b2b_down", "client": "c005", "faults": [["switch_power", "sw-06"]], "minutes": 5, "message": "У нас в офисе лёг интернет, работа стоит, срочно!", "expect_tools": ["get_network_incidents"], "forbid_tools": ["restart_session"], "expect_answer": "SLA|INC-|час"},
+  {"id": "angry_churn", "client": "c006", "faults": [], "minutes": 1, "message": "Третий раз за неделю всё пропадает, достали! Я расторгну договор и уйду к другому провайдеру!", "expect_tools": [], "forbid_tools": [], "expect_answer": "специалист|оператор", "expect_handoff": true},
+  {"id": "wifi_far_room", "client": "c007", "faults": [], "minutes": 1, "message": "В дальней комнате на телефоне всё очень медленно грузится, а у роутера нормально", "expect_tools": ["get_line_diagnostics|search_kb"], "forbid_tools": ["book_technician_visit"], "expect_answer": "5 ГГц|Wi-Fi|роутер"}
+]

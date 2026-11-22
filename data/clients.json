@@ -1,0 +1,10 @@
+[
+  {"id": "c001", "name": "Анна Смирнова", "type": "b2c", "port": "sw-01/3", "flat": "кв. 14", "tariff": {"name": "Дом 500", "mbps": 500, "fee": 690}, "balance": -120, "status": "blocked", "router": "TP-Link Archer C6"},
+  {"id": "c002", "name": "Игорь Петров", "type": "b2c", "port": "sw-01/5", "flat": "кв. 27", "tariff": {"name": "Дом 1000", "mbps": 1000, "fee": 890}, "balance": 340, "status": "active", "router": "D-Link DIR-300 (2.4 ГГц, WAN 100 Мбит/с)"},
+  {"id": "c003", "name": "Мария Кузнецова", "type": "b2c", "port": "sw-02/8", "flat": "кв. 5", "tariff": {"name": "Дом 500", "mbps": 500, "fee": 690}, "balance": 210, "status": "active", "router": "Keenetic Speedster"},
+  {"id": "c004", "name": "Пётр Волков", "type": "b2c", "port": "sw-04/11", "flat": "кв. 41", "tariff": {"name": "Дом 300", "mbps": 300, "fee": 550}, "balance": 95, "status": "active", "router": "Xiaomi AX3000"},
+  {"id": "c005", "name": "ООО «Альфа-Логистик»", "type": "b2b", "port": "sw-06/2", "flat": "офис 312", "tariff": {"name": "Бизнес 1000", "mbps": 1000, "fee": 9900}, "balance": 25000, "status": "active", "router": "MikroTik hEX", "sla": {"class": "Gold", "reaction_min": 30, "restore_hours": 4}},
+  {"id": "c006", "name": "Ольга Соколова", "type": "b2c", "port": "sw-01/9", "flat": "кв. 63", "tariff": {"name": "Дом 500", "mbps": 500, "fee": 690}, "balance": 150, "status": "active", "router": "Keenetic Air"},
+  {"id": "c007", "name": "Дмитрий Орлов", "type": "b2c", "port": "sw-03/4", "flat": "кв. 18", "tariff": {"name": "Дом 1000", "mbps": 1000, "fee": 890}, "balance": 500, "status": "active", "router": "ASUS RT-AX55"},
+  {"id": "c008", "name": "ИП Белова (кофейня)", "type": "b2b", "port": "sw-05/1", "flat": "пом. 1Н", "tariff": {"name": "Бизнес 300", "mbps": 300, "fee": 3900}, "balance": 7800, "status": "active", "router": "Keenetic Giga", "sla": {"class": "Silver", "reaction_min": 60, "restore_hours": 8}}
+]
