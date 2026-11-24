@@ -6,7 +6,7 @@ from datetime import timedelta
 from itertools import count
 from statistics import mean
 
-from .network import AGGS, PARENT, PORTS, RX_FAIL, all_ports, level, pid
+from .network import AGGS, PARENT, PORTS, RX_FAIL, all_ports, level
 
 SEV = {"warning": 1, "major": 2, "critical": 3}
 CABLE = {"cable_degradation", "flapping", "cable_fault"}

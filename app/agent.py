@@ -1,5 +1,6 @@
 """Агент первой линии: работает по плейбукам, но рассуждает и может от них отступать."""
-from . import config, emotion, llm, ops as ops_mod
+from . import config, emotion, ops as ops_mod
+from .cases.common import guarded_run
 from .tools import support_tools
 
 ROLE = """Ты — ИИ-специалист первой линии поддержки интернет-провайдера в чате личного кабинета. Клиент уже авторизован.
@@ -25,5 +26,5 @@ def answer(cid: str, history: list[dict], voice: dict | None = None) -> dict:
         o.handoff(cid, f"уровень недовольства 3: {emo['reason']}", last[:300], priority="critical")
     system = (f"{ROLE}\n\n{_playbooks()}\n\n# Контекст\nСейчас {o.net.t:%d.%m.%Y %H:%M}. Клиент: {cid}.\n"
               f"Тон последнего сообщения: {emo['level']}/3 ({emo['label']}). {TONE[emo['level']]}")
-    text, trace = llm.run_agent(system, history, support_tools(o, cid))
-    return {"answer": text, "trace": trace, "emotion": emo}
+    text, trace, guard = guarded_run("support", system, history, support_tools(o, cid))
+    return {"answer": text, "trace": trace, "emotion": emo, "guard": guard}

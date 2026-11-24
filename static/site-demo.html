@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Демо: ИИ-виджет на сайте провайдера</title>
+<style>
+body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#1d1d1f;background:#f4f5f2}
+.top{background:#fff;border-bottom:1px solid #e3e6df;padding:14px 32px;display:flex;gap:24px;align-items:center}.top b{font-size:18px}.top a{color:#444;text-decoration:none}
+.wrap{max-width:980px;margin:32px auto;padding:0 24px}.hero{background:#fff;border-radius:16px;padding:28px 32px;border:1px solid #e3e6df}
+h1{margin:0 0 8px;font-size:28px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px}
+.box{background:#fff;border:1px solid #e3e6df;border-radius:12px;padding:16px}.box button{margin-top:8px;background:#6fb316;color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer}
+code,pre{background:#1e2430;color:#d7e3ff;border-radius:8px}pre{padding:12px;overflow:auto;font-size:13px}code{padding:1px 5px}
+.note{color:#666;font-size:13px}a.staff{display:inline-block;margin-top:12px;color:#2f7de1}
+</style>
+</head>
+<body>
+<div class="top"><b>Демо-страница</b><a href="#">Для квартиры</a><a href="#">Для частного дома</a><a href="/site-demo.html?biznes">Для бизнеса</a><a href="/staff.html" style="margin-left:auto">Внутренний интерфейс →</a></div>
+<div class="wrap">
+  <div class="hero">
+    <h1>ИИ-консультант для сайта провайдера</h1>
+    <p>Это нейтральная страница-заглушка. Справа внизу работает тот же виджет, который встраивается на настоящий сайт одной строкой. Виджет сам выбирает режим: на страницах для бизнеса — менеджер для бизнеса, для вошедших в личный кабинет — поддержка, для остальных — подключение.</p>
+    <div class="grid">
+      <div class="box"><b>Подключение</b><div class="note">Проверка адреса, подбор тарифа, честный расчёт, запись на монтаж</div><button onclick="SkyNetAI.open('onboarding')">Открыть</button></div>
+      <div class="box"><b>Поддержка клиента</b><div class="note">Видит линию и аварии, решает сам или ставит мастера</div><button onclick="SkyNetAI.open('support')">Открыть</button></div>
+      <div class="box"><b>Для бизнеса</b><div class="note">Собирает задачу и проблемы и передаёт бриф персональному менеджеру</div><button onclick="SkyNetAI.open('b2b')">Открыть</button></div>
+    </div>
+    <a class="staff" href="/staff.html">Что в это время видят сотрудники →</a>
+  </div>
+  <h3>Как встроить на сайт</h3>
+  <pre>&lt;script src="https://ai.example.ru/widget.js" data-mode="auto" async&gt;&lt;/script&gt;</pre>
+  <p class="note">Если пользователь вошёл в личный кабинет, сайт передаёт его идентификатор: <code>data-client="…"</code> или <code>SkyNetAI.login(id)</code> — тогда бот сразу видит его линию и баланс. Стили изолированы (Shadow DOM) и не ломают вёрстку сайта; домены сайта задаются в <code>WIDGET_ORIGINS</code>.</p>
+</div>
+<script src="/widget.js" data-mode="auto" async></script>
+</body>
+</html>

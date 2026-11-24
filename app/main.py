@@ -1,15 +1,31 @@
 import json
+import os
+from datetime import datetime
 from typing import Literal
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import agent, config, emotion, llm, ops as ops_mod, voice
+from .cases import b2b, comms, finmodel, onboarding, quality
+from .cases.common import split_next
 from .network import FAULT_KINDS, PARENT, all_ports
 from .tools import _clean
 
-app = FastAPI(title="SkyNet Sentinel + AI Support")
+app = FastAPI(title="SkyNet AI: виджет для сайта + внутренний интерфейс")
+app.add_middleware(CORSMiddleware, allow_origins=os.getenv("WIDGET_ORIGINS", "*").split(","), allow_methods=["*"], allow_headers=["*"])
+for r in (onboarding.router, b2b.router, quality.router, comms.router, finmodel.router):
+    app.include_router(r)
+CONVERSATIONS: dict[str, dict] = {}
+
+
+def log_conv(sid, mode, client, history, res):
+    c = CONVERSATIONS.setdefault(sid or f"anon-{len(CONVERSATIONS)}", {"sid": sid, "mode": mode, "client": client, "started": datetime.now().isoformat(timespec="seconds")})
+    c.update(updated=datetime.now().isoformat(timespec="seconds"), messages=history + [{"role": "assistant", "content": res["answer"]}],
+             emotion=res.get("emotion"), tools=[t["tool"] for t in res.get("trace", [])], client=client or c["client"])
 
 
 class Msg(BaseModel):
@@ -21,6 +37,15 @@ class ChatIn(BaseModel):
     client_id: str
     messages: list[Msg]
     voice: dict | None = None
+    sid: str | None = None
+
+
+class WidgetIn(BaseModel):
+    mode: Literal["support", "onboarding", "b2b"]
+    messages: list[Msg]
+    client_id: str | None = None
+    voice: dict | None = None
+    sid: str | None = None
 
 
 class StepIn(BaseModel):
@@ -124,9 +149,30 @@ def clients():
 @app.post("/api/chat")
 def chat(x: ChatIn):
     try:
-        return agent.answer(x.client_id, [m.model_dump() for m in x.messages], x.voice)
+        res = agent.answer(x.client_id, [m.model_dump() for m in x.messages], x.voice)
     except KeyError as e:
         raise HTTPException(404, str(e))
+    res |= split_next(res["answer"])
+    log_conv(x.sid, "support", x.client_id, [m.model_dump() for m in x.messages], res)
+    return res
+
+
+@app.post("/api/widget/chat")
+def widget_chat(x: WidgetIn):
+    h = [m.model_dump() for m in x.messages]
+    if x.mode == "support":
+        if not x.client_id:
+            raise HTTPException(400, "нужна авторизация клиента")
+        return chat(ChatIn(client_id=x.client_id, messages=x.messages, voice=x.voice, sid=x.sid))
+    res = (onboarding.answer if x.mode == "onboarding" else b2b.answer)(h)
+    res["emotion"] = emotion.analyze(h[-1]["content"], x.voice, use_llm=False) if h else None
+    log_conv(x.sid, x.mode, x.client_id, h, res)
+    return res
+
+
+@app.get("/api/conversations")
+def conversations():
+    return sorted(CONVERSATIONS.values(), key=lambda c: c["updated"], reverse=True)
 
 
 @app.post("/api/emotion")
@@ -141,6 +187,11 @@ def transcribe(audio: UploadFile = File(...)):
     data = audio.file.read()
     suffix = "." + (audio.filename or "a.webm").rsplit(".", 1)[-1]
     return voice.transcribe(data, suffix)
+
+
+@app.get("/")
+def root():
+    return RedirectResponse("/site-demo.html")
 
 
 app.mount("/", StaticFiles(directory=config.ROOT / "static", html=True), name="static")

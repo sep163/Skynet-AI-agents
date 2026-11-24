@@ -1,0 +1,10 @@
+[
+  {"address": "ул. Савушкина, 12", "status": "connected", "tech": "оптика до дома, кабель до квартиры", "install_days": 1},
+  {"address": "ул. Савушкина, 14", "status": "connected", "tech": "оптика до дома, кабель до квартиры", "install_days": 1},
+  {"address": "Комендантский пр., 7", "status": "connected", "tech": "оптика до дома, кабель до квартиры", "install_days": 1},
+  {"address": "пр. Энгельса, 33", "status": "connected", "tech": "оптика до дома, кабель до квартиры", "install_days": 2},
+  {"address": "Выборгское ш., 5", "status": "connected", "tech": "оптика до дома, кабель до квартиры", "install_days": 2},
+  {"address": "ул. Оптиков, 4", "status": "construction", "tech": "дом подключается", "ready": "2026-12-20"},
+  {"address": "Приморский пр., 54", "status": "none"},
+  {"address": "пос. Парголово, ул. Николая Рубцова, 9", "status": "private", "tech": "частный дом: нужен выезд инженера для оценки"}
+]

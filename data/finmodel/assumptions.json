@@ -1,0 +1,316 @@
+{
+ "_about": "Предпосылки финмодели. kind: source — цифра из открытого источника (url), hh — медиана зарплат с hh.ru (data/finmodel/salaries.json), estimate — оценка команды (проверить с SkyNet на хакатоне).",
+ "company": {
+  "revenue_rub_year": {
+   "value": 3300000000,
+   "unit": "₽/год",
+   "kind": "source",
+   "url": "https://www.kommersant.ru/doc/8735936",
+   "note": "выручка SkyNet 2025 по СПАРК-Интерфакс"
+  },
+  "net_profit_rub_year": {
+   "value": 375000000,
+   "unit": "₽/год",
+   "kind": "source",
+   "url": "https://www.kommersant.ru/doc/8735936",
+   "note": "чистая прибыль 2025"
+  },
+  "b2c_revenue_share": {
+   "value": 0.85,
+   "unit": "доля",
+   "kind": "estimate",
+   "note": "доля выручки от частных клиентов"
+  },
+  "arpu_rub_month": {
+   "value": 600,
+   "unit": "₽/мес",
+   "kind": "estimate",
+   "url": "https://skynet.ru/internet/tarify/",
+   "note": "тарифы 325–1000 ₽/мес; среднее с ТВ и допуслугами"
+  },
+  "contacts_per_sub_month": {
+   "value": 0.2,
+   "unit": "обращений/абонент/мес",
+   "kind": "estimate",
+   "note": "все каналы; уточнить у SkyNet"
+  },
+  "aht_min": {
+   "value": 6,
+   "unit": "мин",
+   "kind": "estimate",
+   "note": "среднее время обработки обращения 1 линией"
+  },
+  "productive_min_month": {
+   "value": 7560,
+   "unit": "мин/мес на 1 ставку",
+   "kind": "estimate",
+   "note": "168 ч × 60 × занятость 75%"
+  },
+  "payroll_overhead": {
+   "value": 1.302,
+   "unit": "×",
+   "kind": "source",
+   "note": "НК РФ ст. 425: единый тариф страховых взносов 30% + взнос на травматизм от 0,2%"
+  },
+  "workplace_overhead": {
+   "value": 1.15,
+   "unit": "×",
+   "kind": "estimate",
+   "note": "рабочее место, ПО, обучение, текучесть"
+  },
+  "usd_rub": {
+   "value": 83.0,
+   "unit": "₽/$",
+   "kind": "source",
+   "url": "https://1000bankov.ru/kurs/cbrf-date/13-11-26/",
+   "note": "курс ЦБ на 13.11.2026 — 82,98"
+  }
+ },
+ "llm": {
+  "_unit": "₽ за 1000 токенов (вход / выход)",
+  "claude-haiku-5-5": {
+   "in": 0.0083,
+   "out": 0.0415,
+   "kind": "source",
+   "url": "https://platform.claude.com/docs/en/about-claude/pricing",
+   "note": "$0,10 / $0,50 за 1 млн токенов × курс; данные за рубеж — проверить 152-ФЗ"
+  },
+  "gigachat-lite": {
+   "in": 0.065,
+   "out": 0.065,
+   "kind": "source",
+   "url": "https://developers.sber.ru/docs/ru/gigachat/tariffs/legal-tariffs",
+   "note": "pay-as-you-go, с НДС"
+  },
+  "gigachat-pro": {
+   "in": 0.5,
+   "out": 0.5,
+   "kind": "source",
+   "url": "https://developers.sber.ru/docs/ru/gigachat/tariffs/legal-tariffs",
+   "note": "pay-as-you-go, с НДС"
+  },
+  "yandexgpt-lite": {
+   "in": 0.2,
+   "out": 0.2,
+   "kind": "source",
+   "url": "https://yandex.cloud/ru/docs/foundation-models/pricing",
+   "note": "по поисковой выдаче; страница недоступна из сети прототипа — сверить"
+  },
+  "yandexgpt-pro": {
+   "in": 0.8,
+   "out": 0.8,
+   "kind": "source",
+   "url": "https://yandex.cloud/ru/docs/foundation-models/pricing",
+   "note": "Pro 5.1 по обзору Quasa; сверить на странице тарифов"
+  },
+  "tokens_in_per_dialog": {
+   "value": 25000,
+   "kind": "estimate",
+   "note": "4–6 реплик, системный промпт + плейбук + результаты инструментов"
+  },
+  "tokens_out_per_dialog": {
+   "value": 1500,
+   "kind": "estimate"
+  }
+ },
+ "stt": {
+  "speechkit_rub_min": {
+   "value": 0.6,
+   "kind": "source",
+   "url": "https://yandex.cloud/ru/docs/speechkit/pricing",
+   "note": "асинхронное распознавание 0,15 ₽ за 15 с"
+  },
+  "local_whisper_rub_min": {
+   "value": 0.0,
+   "kind": "estimate",
+   "note": "faster-whisper на своём сервере: только амортизация железа"
+  }
+ },
+ "build": {
+  "dev_months": {
+   "value": 3,
+   "unit": "мес",
+   "kind": "estimate",
+   "note": "MVP → пилот на одном направлении"
+  },
+  "dev_fte": {
+   "value": 2,
+   "unit": "ставки",
+   "kind": "estimate",
+   "note": "разработчик + ML/LLM-инженер"
+  },
+  "run_fte": {
+   "value": 0.5,
+   "unit": "ставки",
+   "kind": "estimate",
+   "note": "сопровождение, обновление плейбуков и базы знаний"
+  }
+ },
+ "directions": {
+  "support": {
+   "title": "Клиентские обращения",
+   "hypothesis": "ИИ первой линии с доступом к линии, авариям и биллингу закрывает типовые обращения сам, а Сентинел снимает волну звонков при авариях проактивным уведомлением",
+   "chat_share": {
+    "value": 0.5,
+    "kind": "estimate",
+    "note": "доля обращений, которые придут в чат/виджет, а не на телефон"
+   },
+   "automation_rate": {
+    "value": 0.35,
+    "kind": "source",
+    "url": "https://yandex.cloud/ru/blog/posts/2025/04/ai-and-support",
+    "note": "кейсы: банк ~30%, Чистовье 30%, Т-Банк 20→40%; берём середину"
+   },
+   "outage_contact_share": {
+    "value": 0.25,
+    "kind": "estimate",
+    "note": "доля обращений «нет интернета» из-за аварий"
+   },
+   "proactive_deflection": {
+    "value": 0.4,
+    "kind": "estimate",
+    "note": "доля таких обращений, которых не будет после проактивного уведомления"
+   },
+   "role": "support_l1"
+  },
+  "onboarding": {
+   "title": "Подключение новых клиентов",
+   "hypothesis": "ИИ-консультант 24/7 сразу проверяет адрес, считает цену и записывает на монтаж: меньше брошенных заявок и меньше работы менеджеров",
+   "gross_adds_rate_month": {
+    "value": 0.015,
+    "kind": "estimate",
+    "note": "новые подключения в месяц как доля базы"
+   },
+   "manager_min_per_connection": {
+    "value": 25,
+    "kind": "estimate",
+    "note": "звонок-квалификация, подбор тарифа, запись"
+   },
+   "automation_rate": {
+    "value": 0.4,
+    "kind": "estimate",
+    "note": "доля подключений, оформленных ботом до конца"
+   },
+   "conversion_uplift": {
+    "value": 0.05,
+    "kind": "estimate",
+    "note": "+5% подключений за счёт ответа ночью и без ожидания"
+   },
+   "contribution_margin": {
+    "value": 0.4,
+    "kind": "estimate",
+    "note": "маржинальность дополнительного абонента"
+   },
+   "lifetime_months": {
+    "value": 36,
+    "kind": "estimate"
+   },
+   "role": "sales_consultant",
+   "dialogs_per_connection": {
+    "value": 3,
+    "kind": "estimate",
+    "note": "на одно подключение приходится ~3 диалога консультанта (часть не доходит до заявки)"
+   }
+  },
+  "b2b": {
+   "title": "Работа с бизнес-клиентами",
+   "hypothesis": "Бот только собирает бриф и передаёт менеджеру: менеджер не тратит первый звонок на квалификацию и отвечает быстрее",
+   "leads_month": {
+    "value": 150,
+    "kind": "estimate",
+    "note": "входящие B2B-запросы с сайта и звонков"
+   },
+   "manager_min_saved_per_lead": {
+    "value": 30,
+    "kind": "estimate",
+    "note": "первичная квалификация и сбор данных"
+   },
+   "conversion_uplift": {
+    "value": 0.03,
+    "kind": "estimate",
+    "note": "+3 п.п. конверсии лида за счёт ответа за 2 часа вместо следующего дня"
+   },
+   "b2b_arpu_month": {
+    "value": 7000,
+    "kind": "estimate",
+    "note": "по демо-каталогу: канал + резерв + Wi-Fi/камеры"
+   },
+   "contribution_margin": {
+    "value": 0.5,
+    "kind": "estimate"
+   },
+   "lifetime_months": {
+    "value": 36,
+    "kind": "estimate"
+   },
+   "role": "b2b_manager"
+  },
+  "quality": {
+   "title": "Качество обслуживания",
+   "hypothesis": "ИИ проверяет 100% диалогов по чек-листу вместо выборочной прослушки 2–3% и выводит универсальные решения в скрипты",
+   "manual_review_share": {
+    "value": 0.03,
+    "kind": "estimate",
+    "note": "доля диалогов, которые сейчас проверяет человек"
+   },
+   "manual_review_min": {
+    "value": 8,
+    "kind": "estimate",
+    "note": "минут на проверку одного диалога"
+   },
+   "call_min_per_contact": {
+    "value": 5,
+    "kind": "estimate",
+    "note": "для расчёта транскрибации звонков"
+   },
+   "phone_share": {
+    "value": 0.5,
+    "kind": "estimate"
+   },
+   "repeat_contact_reduction": {
+    "value": 0.05,
+    "kind": "estimate",
+    "note": "минус 5% повторных обращений после доработки скриптов"
+   },
+   "role": "qa_specialist",
+   "manual_time_kept": {
+    "value": 0.3,
+    "kind": "estimate",
+    "note": "доля времени контролёров, которая остаётся на калибровку ИИ и разбор спорных оценок"
+   },
+   "qa_tokens_in": {
+    "value": 4000,
+    "kind": "estimate"
+   },
+   "qa_tokens_out": {
+    "value": 800,
+    "kind": "estimate"
+   }
+  },
+  "comms": {
+   "title": "Реклама и коммуникации",
+   "hypothesis": "ИИ пишет варианты под сегмент и канал, а проверяльщик сверяет каждую цифру с прайсом и ловит нарушения закона о рекламе до публикации",
+   "messages_month": {
+    "value": 80,
+    "kind": "estimate",
+    "note": "рассылки, push, посты, баннеры, уведомления об авариях"
+   },
+   "copy_hours_saved_per_message": {
+    "value": 1.0,
+    "kind": "estimate"
+   },
+   "fine_rub": {
+    "value": 300000,
+    "kind": "source",
+    "url": "https://www.consultant.ru/document/cons_doc_LAW_34661/",
+    "note": "КоАП РФ ст. 14.3 ч.1: юрлицам 100–500 тыс. ₽; берём середину"
+   },
+   "fine_prob_year": {
+    "value": 0.1,
+    "kind": "estimate",
+    "note": "вероятность штрафа за год без проверки"
+   },
+   "role": "copywriter"
+  }
+ }
+}

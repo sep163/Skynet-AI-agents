@@ -37,11 +37,10 @@ class KB:
         return [{**self.docs[i], "score": round(s, 2)} for s, i in sorted(res, reverse=True)[:k]]
 
 
-_kb = None
+_kbs: dict[str, KB] = {}
 
 
-def get_kb() -> KB:
-    global _kb
-    if _kb is None:
-        _kb = KB()
-    return _kb
+def get_kb(folder: str = "kb") -> KB:
+    if folder not in _kbs:
+        _kbs[folder] = KB(config.DATA / folder)
+    return _kbs[folder]

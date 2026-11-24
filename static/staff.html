@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyNet AI — внутренний интерфейс</title>
+<style>
+:root{--bg:#0f1420;--panel:#171e2e;--line:#26304a;--text:#e6e9f2;--mute:#8b94ad;--ok:#2fbf71;--warn:#e6b23a;--major:#f08a3c;--crit:#ef4d5a;--acc:#6fb316;--blue:#4f8cff}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+header{display:flex;gap:6px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;background:var(--bg);z-index:5}
+header h1{font-size:15px;margin:0 14px 0 0}.tab{background:none;border:0;color:var(--mute);padding:6px 10px;border-radius:6px;cursor:pointer;font:inherit}.tab.on{background:var(--panel);color:var(--text)}
+.tab .n{background:var(--crit);color:#fff;border-radius:8px;padding:0 6px;font-size:11px;margin-left:4px}
+button,select,input,textarea{font:inherit;color:var(--text);background:#1f2840;border:1px solid var(--line);border-radius:6px;padding:5px 10px}
+button{cursor:pointer}button:hover{border-color:var(--acc)}button.pri{background:var(--acc);border-color:var(--acc);color:#fff}button.ok{background:#1d5c3b}button.no{background:#5c1d25}
+.badge{font-size:12px;padding:2px 8px;border-radius:10px;background:#26304a;color:var(--mute);display:inline-block}
+section{display:none;padding:12px;gap:12px}section.on{display:grid}.two{grid-template-columns:1.3fr 1fr}.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.clock{font:600 17px ui-monospace,monospace;color:var(--acc)}
+.tiles{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.tile{border-radius:8px;padding:6px;border:1px solid var(--line);font-size:12px}.tile b{display:block}
+.s-ok{border-left:4px solid var(--ok)}.s-warning{border-left:4px solid var(--warn)}.s-major{border-left:4px solid var(--major)}.s-critical{border-left:4px solid var(--crit)}
+.card{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;background:#141a28}.card.resolved,.done{opacity:.55}
+.card .t{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ev{color:var(--mute);font-size:12.5px;margin-top:3px}
+.sev{font-size:11px;font-weight:700;padding:1px 7px;border-radius:8px;color:#000}.sev.warning{background:var(--warn)}.sev.major{background:var(--major)}.sev.critical{background:var(--crit);color:#fff}.sev.ok{background:var(--ok)}
+.brief{white-space:pre-wrap;background:#0f1522;border-radius:6px;padding:8px;margin-top:6px;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}td,th{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.m{padding:6px 9px;border-radius:8px;margin:4px 0;white-space:pre-wrap}.m.user{background:#24407a}.m.assistant{background:#222b40}
+.e0{color:var(--ok)}.e1{color:var(--warn)}.e2{color:var(--major)}.e3{color:var(--crit);font-weight:700}
+.sc0{background:#5c1d25}.sc1{background:#5c4a1d}.sc2{background:#1d5c3b}.sc{display:inline-block;min-width:22px;text-align:center;border-radius:5px;padding:0 4px}
+textarea{width:100%;min-height:90px}.iss{color:var(--crit);font-size:12.5px}.okc{color:var(--ok);font-size:12.5px}del{color:var(--mute)}
+@media(max-width:1100px){.two{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>SkyNet AI · сотрудникам</h1>
+  <button class="tab on" data-t="net">Пульт сети<span class="n" id="n-net" hidden></span></button>
+  <button class="tab" data-t="conv">Диалоги</button>
+  <button class="tab" data-t="onb">Подключения</button>
+  <button class="tab" data-t="b2b">B2B запросы<span class="n" id="n-b2b" hidden></span></button>
+  <button class="tab" data-t="qa">Качество</button>
+  <button class="tab" data-t="comms">Коммуникации</button>
+  <button class="tab" data-t="fin">Экономика</button>
+  <span class="badge" id="model" style="margin-left:auto"></span><a class="badge" href="/site-demo.html" target="_blank">Сайт с виджетом ↗</a>
+</header>
+
+<section id="net" class="two on">
+  <div class="col">
+    <div class="panel"><h2>Сеть <span class="clock" id="clock"></span></h2>
+      <div class="row" style="margin-bottom:8px"><button onclick="step(1)">+1 мин</button><button onclick="step(5)">+5</button><button onclick="step(30)">+30</button><button id="play" onclick="togglePlay()">▶ авто</button>
+        <select id="kind" onchange="fillTargets()"></select><select id="target"></select><button onclick="inject()">Внести неисправность</button><button onclick="resetSim()">Сброс</button>
+        <label class="badge"><input type="checkbox" id="auto" checked onchange="api('/api/sim/autonomy',{approve:this.checked})"> ИИ сам выполняет безопасное</label></div>
+      <div class="tiles" id="tiles"></div><div class="ev" id="netinfo"></div></div>
+    <div class="panel"><h2>Требует решения человека <span class="badge" id="pcount"></span></h2><div id="pending"></div></div>
+    <div class="panel"><h2>Инциденты мониторинга</h2><div id="incidents"></div></div>
+  </div>
+  <div class="col">
+    <div class="panel"><h2>График мастеров</h2><div id="jobs"></div></div>
+    <div class="panel"><h2>Что ИИ сделал сам</h2><div id="log"></div></div>
+  </div>
+</section>
+
+<section id="conv" class="two">
+  <div class="panel"><h2>Диалоги с сайта <button onclick="loadConv()">Обновить</button></h2><div id="convlist"></div></div>
+  <div class="panel"><h2>Диалог <span id="convact"></span></h2><div id="convview" class="ev">Выберите диалог слева</div></div>
+</section>
+
+<section id="onb" class="two">
+  <div class="panel"><h2>Заявки на подключение <button onclick="loadOnb()">Обновить</button></h2><div id="apps"></div></div>
+  <div class="panel"><h2>Лист ожидания</h2><div id="waits"></div></div>
+</section>
+
+<section id="b2b"><div class="panel"><h2>Запросы бизнес-клиентов: бриф от бота → решение менеджера <button onclick="loadB2b()">Обновить</button></h2><div id="kps"></div></div></section>
+
+<section id="qa" class="two">
+  <div class="col">
+    <div class="panel"><h2>Диалоги на оценке <span class="row"><button class="pri" onclick="scoreAll(this)">Оценить все</button><button onclick="getInsights(this)">Универсальные решения</button></span></h2>
+      <div class="ev" id="agree"></div><div id="qalist"></div></div>
+    <div class="panel"><h2>Универсальные решения по типам проблем</h2><div id="insights" class="ev">Сначала оцените диалоги</div></div>
+  </div>
+  <div class="col">
+    <div class="panel"><h2>Оценить свой диалог или звонок</h2>
+      <textarea id="qatext" placeholder="К: у меня не работает интернет&#10;О: перезагрузите роутер"></textarea>
+      <div class="row" style="margin-top:6px"><button class="pri" onclick="scoreText(this)">Оценить</button><label class="badge">Аудио звонка (локальная расшифровка): <input type="file" id="qaaudio" accept="audio/*" onchange="transcribeFile(this)"></label></div></div>
+    <div class="panel"><h2>Результат</h2><div id="qaresult" class="ev">—</div></div>
+  </div>
+</section>
+
+<section id="comms" class="two">
+  <div class="col">
+    <div class="panel"><h2>Новое сообщение</h2>
+      <textarea id="goal" placeholder="Задача: например, рассказать семьям про Дом 500 и акцию первого месяца"></textarea>
+      <div class="row" style="margin-top:6px"><select id="channel"></select><select id="segment"></select><button class="pri" onclick="generate(this)">Сгенерировать 3 варианта</button></div></div>
+    <div class="panel"><h2>Варианты (каждая цифра сверена с фактами)</h2><div id="variants" class="ev">—</div></div>
+  </div>
+  <div class="col">
+    <div class="panel"><h2>Проверить готовый текст</h2><textarea id="manual" placeholder="Вставьте текст рассылки или поста"></textarea><div class="row" style="margin-top:6px"><button onclick="checkManual()">Проверить</button></div><div id="mres"></div></div>
+    <div class="panel"><h2>Очередь на отправку</h2><div id="drafts"></div></div>
+  </div>
+</section>
+
+<section id="fin">
+  <div class="panel"><h2>Цикл тестирования гипотез</h2>
+    <div class="row" style="gap:10px"><span class="badge">1 · Исследование: hh.ru, «Работа России», СПАРК, прайсы API</span>→<span class="badge">2 · Гипотеза по каждой функции</span>→<span class="badge">3 · Предпосылки доходов и расходов</span>→<span class="badge">4 · Финмодель</span>→<span class="badge">5 · Самые и наименее доходные функции</span>↺</div>
+    <div class="row" style="margin-top:8px">LLM: <select id="fmodel"></select> Транскрибация: <select id="fstt"><option value="local_whisper_rub_min">локально (whisper)</option><option value="speechkit_rub_min">Yandex SpeechKit</option></select>
+      <button class="pri" onclick="loadFin()">Пересчитать</button><button onclick="FIN_OV={};loadFin()">Сбросить правки</button><span class="ev" id="fsum"></span></div></div>
+  <div class="panel"><h2>Результат по направлениям (₽)</h2><div id="ftable"></div></div>
+  <div class="two" style="display:grid;gap:12px">
+    <div class="panel"><h2>Предпосылки — правьте и пересчитывайте</h2><div class="ev">🟢 источник · 🟡 оценка команды (проверить с SkyNet) · 🔵 ваша правка</div><div id="fassump"></div></div>
+    <div class="panel"><h2>Зарплаты СПб (hh.ru, gross, медиана)</h2><div id="fsal"></div></div>
+  </div>
+</section>
+
+<script>
+const $=id=>document.getElementById(id);let S=null,play=null,META=null,CONV=[];
+const SEV={warning:1,major:2,critical:3},LV={cable_degradation:'port',speed_downgrade:'port',optic_degradation:'switch',switch_power:'switch',congestion:'agg'};
+const KL={cable_degradation:'Деградация кабеля',speed_downgrade:'Порт 100 Мбит/с',optic_degradation:'Деградация оптики',switch_power:'Нет питания коммутатора',congestion:'Перегрузка узла'};
+const api=async(u,b)=>{const r=await fetch(u,{method:b?'POST':'GET',headers:b instanceof FormData?{}:{'Content-Type':'application/json'},body:b instanceof FormData?b:b?JSON.stringify(b):undefined});if(!r.ok)throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail);return r.json()};
+const tm=s=>s?String(s).replace('T',' ').slice(5,16):'',esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])),rub=n=>Number(n).toLocaleString('ru-RU')+' ₽';
+const busy=async(btn,f)=>{const t=btn.textContent;btn.disabled=true;btn.textContent='ИИ думает…';try{await f()}catch(e){alert(e.message)}btn.disabled=false;btn.textContent=t};
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,section').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.t).classList.add('on');({conv:loadConv,onb:loadOnb,b2b:loadB2b,qa:loadQa,comms:loadComms,fin:loadFin}[b.dataset.t]||(()=>{}))()});
+
+/* ---- пульт сети ---- */
+async function load(){S=await api('/api/state');render()}
+async function step(n){S=await api('/api/sim/step',{minutes:n});render()}
+function togglePlay(){if(play){clearInterval(play);play=null;$('play').textContent='▶ авто'}else{play=setInterval(()=>step(1),700);$('play').textContent='⏸ пауза'}}
+async function inject(){await api('/api/sim/inject',{kind:$('kind').value,target:$('target').value});load()}
+async function resetSim(){S=await api('/api/sim/reset',{});render()}
+async function decide(id,ok){await api(`/api/actions/${id}/decide`,{approve:ok});load()}
+async function complete(id){await api(`/api/jobs/${id}/complete`,{});load()}
+async function brief(id,btn){busy(btn,async()=>{const r=await api(`/api/incidents/${id}/brief`,{});$('b-'+id).innerHTML=`<div class="brief">${esc(r.brief)}</div>`})}
+function fillTargets(){$('target').innerHTML=S.targets[LV[$('kind').value]].map(t=>`<option>${t}</option>`).join('')}
+function render(){
+  $('clock').textContent=S.network.t.replace('T',' ');
+  if(!$('kind').options.length){$('kind').innerHTML=S.fault_kinds.map(k=>`<option value="${k}">${KL[k]}</option>`).join('');fillTargets();$('target').value='sw-01/5'}
+  const open=S.incidents.filter(i=>i.status==='open');
+  const worst=s=>open.filter(i=>i.target===s.id||i.target.startsWith(s.id+'/')||i.target===s.agg).reduce((a,i)=>SEV[i.severity]>(SEV[a]||0)?i.severity:a,'ok');
+  $('tiles').innerHTML=S.network.switches.map(s=>{const w=s.reachable?worst(s):'critical';return `<div class="tile s-${w}"><b>${s.id} · ${s.agg}</b>${esc(s.building)}<br>${s.reachable?`RX ${s.rx_dbm} дБм`:'<span style="color:var(--crit)">нет связи</span>'} · down: ${s.ports_down}</div>`}).join('');
+  $('netinfo').textContent=S.network.aggs.map(a=>`${a.id}: ${Math.round(a.util)}% / ${a.latency_ms} мс`).join(' · ');
+  const pend=S.actions.filter(a=>a.status==='pending');$('pcount').textContent=pend.length;$('n-net').hidden=!pend.length;$('n-net').textContent=pend.length;
+  $('pending').innerHTML=pend.map(a=>{const d=a.details||{};return `<div class="card"><div class="t"><span class="sev ${a.priority==='critical'?'critical':a.priority==='high'?'major':'warning'}">${a.priority}</span><b>${esc(a.title)}</b><span class="badge">${a.type} · ${a.id}${a.incident_id?' · '+a.incident_id:''}</span></div>
+   <div class="ev">${d.slot?`Слот: ${tm(d.slot.start)}–${tm(d.slot.end).slice(-5)}, ${esc(d.slot.tech)}. `:''}${d.deadline?`Отказ прогнозируется к ${tm(d.deadline)}. `:''}${d.warning?`<b style="color:var(--crit)">⚠ ${esc(d.warning)}</b> `:''}${d.evidence?'Основание: '+esc(d.evidence):''}${d.summary?'Клиент: '+esc(d.summary):''}</div>
+   <div class="row" style="margin-top:6px"><button class="ok" onclick="decide('${a.id}',true)">Одобрить</button><button class="no" onclick="decide('${a.id}',false)">Отклонить</button></div></div>`}).join('')||'<div class="ev">Очередь пуста — всё решено автоматически</div>';
+  $('incidents').innerHTML=S.incidents.slice(0,30).map(i=>`<div class="card ${i.status}"><div class="t"><span class="sev ${i.severity}">${i.severity}</span><b>${esc(i.title)}</b><span class="badge">${i.target} · ${i.id} · ${tm(i.detected_at)}${i.status==='resolved'?' → решён '+tm(i.resolved_at):''}</span>${i.first_kind!==i.kind?`<span class="badge">эскалация ${i.first_kind} → ${i.kind}</span>`:''}</div>
+   <div class="ev">${esc(i.evidence)}</div><div class="ev">→ ${esc(i.recommendation)}</div><button onclick="brief('${i.id}',this)" style="margin-top:4px">Разбор ИИ</button><div id="b-${i.id}"></div></div>`).join('')||'<div class="ev">Сеть в норме</div>';
+  $('jobs').innerHTML='<table>'+S.technicians.map(t=>`<tr><td><b>${esc(t.name)}</b><br><span class="badge">${t.skills.join(', ')} · ${t.shift.join('–')}</span></td><td>${S.jobs.filter(j=>j.tech_id===t.id).map(j=>`<div class="${j.status==='done'?'done':''}">${tm(j.start).slice(-5)}–${tm(j.end).slice(-5)} ${esc(j.reason)} <span class="badge">${{tentative:'ждёт одобрения',confirmed:'подтверждён',done:'выполнен'}[j.status]||j.status}</span>${j.status==='confirmed'&&j.incident_id?` <button onclick="complete('${j.id}')">Выполнено</button>`:''}</div>`).join('')}</td></tr>`).join('')+'</table>';
+  $('log').innerHTML=S.actions.filter(a=>a.status!=='pending').slice(0,25).map(a=>`<div class="ev">${tm(a.decided_at||a.created_at).slice(-5)} <span class="badge">${a.status==='done'?'авто':a.status==='approved'?'одобрено':'отклонено'}</span> ${esc(a.title)}</div>`).join('');
+}
+
+/* ---- диалоги ---- */
+async function loadConv(){CONV=await api('/api/conversations');const L={support:'поддержка',onboarding:'подключение',b2b:'бизнес'};
+  $('convlist').innerHTML=CONV.map((c,i)=>{const e=c.emotion?.level??0,last=c.messages.filter(m=>m.role==='user').pop();return `<div class="card" style="cursor:pointer" onclick="showConv(${i})"><div class="t"><span class="badge">${L[c.mode]}</span>${c.client?`<b>${esc(c.client)}</b>`:''}<span class="e${e}">тон ${e}/3</span><span class="badge">${tm(c.updated)}</span></div><div class="ev">${esc(last?.content).slice(0,140)}</div><div class="ev">инструменты: ${esc(c.tools.join(' → '))||'—'}</div></div>`}).join('')||'<div class="ev">Пока пусто: напишите в виджет на сайте</div>'}
+function showConv(i){const c=CONV[i];$('convview').innerHTML=c.messages.map(m=>`<div class="m ${m.role}">${esc(m.content)}</div>`).join('')+(c.emotion?`<div class="ev e${c.emotion.level}">Тон: ${c.emotion.level}/3 — ${esc(c.emotion.reason)}</div>`:'');
+  $('convact').innerHTML=`<button onclick="scoreConv(${i},this)">Оценить качество</button>`}
+async function scoreConv(i,btn){busy(btn,async()=>{const r=await api('/api/quality/score',{dialog:CONV[i].messages.map(m=>[m.role==='user'?'client':'agent',m.content])});$('convview').innerHTML+=qaHtml(r.result)})}
+
+/* ---- подключения ---- */
+async function loadOnb(){const s=await api('/api/onboarding/state');
+  $('apps').innerHTML=s.applications.map(a=>`<div class="card"><div class="t"><b>${a.id}</b><span class="badge">${esc(a.status)}</span></div><div class="ev">${esc(a.name)} · ${esc(a.phone)} · ${esc(a.address)}<br>тариф ${esc(a.tariff_id)} · ${rub(a.payment.monthly_total_rub)}/мес · монтаж ${tm(a.slot.start)}</div></div>`).join('')||'<div class="ev">Заявок пока нет</div>';
+  $('waits').innerHTML=s.waitlist.map(w=>`<div class="card"><b>${w.id}</b><div class="ev">${esc(w.name)} · ${esc(w.phone)} · ${esc(w.address)}</div></div>`).join('')||'<div class="ev">Пусто</div>'}
+
+/* ---- B2B ---- */
+async function loadB2b(){const ls=await api('/api/b2b/leads');const pend=ls.filter(l=>l.status.startsWith('новый')).length;$('n-b2b').hidden=!pend;$('n-b2b').textContent=pend;
+  $('kps').innerHTML=ls.map(l=>`<div class="card"><div class="t"><b>${l.id} · ${esc(l.company)}</b><span class="badge">${esc(l.industry)} · точек: ${l.locations} · сотрудников: ${l.employees}</span><span class="badge">${esc(l.urgency)}</span><span class="badge">${esc(l.status)}</span></div>
+   <div class="ev">Контакт: ${esc(l.contact_name)}, ${esc(l.contact)} · менеджер: <b>${esc(l.manager)}</b>, перезвонить до ${tm(l.callback_by)}</div>
+   <table><tr><td>Сейчас</td><td>${esc(l.current_connection)||'—'}</td></tr><tr><td>Критично</td><td>${l.critical_processes.map(esc).join('; ')||'—'}</td></tr><tr><td>Проблемы</td><td>${l.problems.map(esc).join('; ')||'—'}</td></tr><tr><td>Пожелания</td><td>${l.requirements.map(esc).join('; ')||'—'}</td></tr></table>
+   ${l.missing.length?`<div class="ev" style="color:var(--warn)">Не выяснено: ${l.missing.map(esc).join(', ')}</div>`:''}
+   <details style="margin-top:6px"><summary class="ev">Черновик решения от ИИ (только для менеджера): ${rub(l.draft.monthly_total_rub)}/мес + ${rub(l.draft.once_total_rub)} разово</summary>
+   <table>${l.draft.lines.map(x=>`<tr><td>${esc(x.name)}${x.qty>1?' × '+x.qty:''}</td><td class="ev">${esc(x.why)} → ${esc(x.value)}</td><td>${rub(x.monthly_rub)}/мес${x.once_rub?' + '+rub(x.once_rub):''}</td></tr>`).join('')}</table></details>
+   <div class="row" style="margin-top:6px"><button onclick="lead('${l.id}','take')">Взять в работу</button><button class="ok" onclick="lead('${l.id}','proposal')">КП подготовлено</button><button onclick="lead('${l.id}','more_info')">Нужна доп. информация</button></div></div>`).join('')||'<div class="ev">Запросов пока нет: напишите в виджет во вкладке «Для бизнеса»</div>'}
+async function lead(id,a){await api(`/api/b2b/leads/${id}/decide`,{action:a});loadB2b()}
+
+/* ---- качество ---- */
+let QA=null;
+async function loadQa(){QA=await api('/api/quality/dialogs');const a=QA.agreement;
+  $('agree').innerHTML=a.n_dialogs?`Согласие ИИ с оценками людей (${a.n_dialogs} диал.): точно ${Math.round(a.exact*100)}% · ±1 балл ${Math.round(a.within_1*100)}%`:'Эталонные оценки людей есть для каждого диалога — после оценки увидите согласие ИИ с ними';
+  $('qalist').innerHTML='<table><tr><th>Диалог</th>'+QA.checklist.map(c=>`<th title="${esc(c.desc)}">${esc(c.name)}</th>`).join('')+'<th>Итог</th><th></th></tr>'+QA.dialogs.map(d=>`<tr><td><b>${d.id}</b> ${esc(d.agent)}<br><span class="ev">${esc(d.problem)}</span></td>${QA.checklist.map((c,i)=>{const s=d.result?.scores[i]?.score,h=d.labels[c.id];return `<td>${s!=null?`<span class="sc sc${s}" title="${esc(d.result.scores[i].evidence)}">${s}</span>`:''} <span class="ev" title="оценка человека">(${h})</span></td>`}).join('')}<td>${d.result?d.result.total+'%':''}</td><td><button onclick="scoreOne('${d.id}',this)">${d.result?'↻':'Оценить'}</button></td></tr>`).join('')+'</table>'}
+async function scoreOne(id,btn){await busy(btn,async()=>{const r=await api(`/api/quality/score/${id}`,{});$('qaresult').innerHTML=`<b>${id}</b>`+qaHtml(r.result)});loadQa()}
+async function scoreAll(btn){await busy(btn,async()=>{for(const d of QA.dialogs){btn.textContent=`Оцениваю ${d.id}…`;await api(`/api/quality/score/${d.id}`,{});await loadQa()}})}
+async function getInsights(btn){busy(btn,async()=>{const r=await api('/api/quality/insights',{});
+  $('insights').innerHTML=`<div class="ev">По критериям: ${Object.entries(r.by_criterion).map(([k,v])=>`${esc(k)} ${v}%`).join(' · ')}<br>По сотрудникам: ${Object.entries(r.by_agent).map(([k,v])=>`${esc(k)} ${v}%`).join(' · ')}</div>`+
+  r.solutions.map(s=>`<div class="card"><b>${esc(s.problem)}</b><div class="ev">✔ ${esc(s.universal_solution)}</div><div class="brief">«${esc(s.script)}»</div><div class="ev">✘ Нельзя: ${esc(s.anti_pattern)}</div></div>`).join('')})}
+function qaHtml(r){return `<div class="brief"><b>${r.total}%</b> · ${esc(r.summary)}</div><table>${r.scores.map(s=>`<tr><td><span class="sc sc${s.score}">${s.score}</span> ${esc(s.name)}</td><td class="ev">«${esc(s.evidence)}»${s.score<2?'<br>→ '+esc(s.fix):''}</td></tr>`).join('')}</table><div class="ev">Как надо было: ${esc(r.better_reply)}</div>`}
+async function scoreText(btn){busy(btn,async()=>{const r=await api('/api/quality/score',{text:$('qatext').value});$('qaresult').innerHTML=qaHtml(r.result)})}
+async function transcribeFile(inp){const fd=new FormData();fd.append('audio',inp.files[0],inp.files[0].name);$('qaresult').textContent='Расшифровываю локально…';
+  try{const r=await api('/api/transcribe',fd);$('qatext').value='К: '+r.text;$('qaresult').textContent=`Готово (${r.duration_s} с). Разметьте реплики «К:» и «О:» и нажмите «Оценить».`}catch(e){$('qaresult').textContent=e.message}}
+
+/* ---- коммуникации ---- */
+async function loadComms(){META=await api('/api/comms/meta');if(!$('channel').options.length){$('channel').innerHTML=Object.entries(META.channels).map(([k,v])=>`<option value="${k}">${v.name} (до ${v.max_chars})</option>`).join('');$('segment').innerHTML=META.segments.map(s=>`<option>${s}</option>`).join('')}
+  $('drafts').innerHTML=META.drafts.map(d=>`<div class="card"><div class="t"><b>${d.id}</b><span class="badge">${d.channel} · ${esc(d.segment)}</span><span class="badge">${esc(d.status)}</span></div><div class="ev">${esc(d.goal)}</div>${d.chosen!=null?`<div class="brief">${esc(d.variants[d.chosen].text)}</div>`:''}</div>`).join('')||'<div class="ev">Пусто</div>'}
+const chk=c=>c.ok?`<div class="okc">✔ Проверка пройдена · ${c.chars}/${c.limit} знаков</div>`:c.issues.map(i=>`<div class="iss">✘ ${esc(i.msg)}</div>`).join('');
+async function generate(btn){busy(btn,async()=>{const d=await api('/api/comms/generate',{goal:$('goal').value,channel:$('channel').value,segment:$('segment').value});
+  $('variants').innerHTML=d.variants.map((v,i)=>`<div class="card"><div class="ev">Идея: ${esc(v.idea)}</div><div class="brief">${esc(v.text)}</div>${chk(v.check)}${v.revised?`<details class="ev"><summary>ИИ исправил черновик после проверки</summary><del>${esc(v.before)}</del>${v.before_issues.map(x=>`<div class="iss">✘ ${esc(x.msg)}</div>`).join('')}</details>`:''}
+   ${v.check.ok?`<button class="ok" onclick="approve('${d.id}',${i})">Одобрить к отправке</button>`:''}</div>`).join('');loadComms()})}
+async function approve(id,i){await api(`/api/comms/drafts/${id}/approve`,{variant:i});loadComms()}
+async function checkManual(){if(!META)await loadComms();$('mres').innerHTML=chk(await api('/api/comms/check',{text:$('manual').value,channel:$('channel').value,segment:$('segment').value}))}
+
+/* ---- экономика ---- */
+let FIN_OV={};const mln=n=>(n/1e6).toLocaleString('ru-RU',{maximumFractionDigits:1})+' млн';
+async function loadFin(){const r=await api('/api/finmodel',{model:$('fmodel').value||'claude-haiku-5-5',stt:$('fstt').value,overrides:FIN_OV});
+  if(!$('fmodel').options.length){$('fmodel').innerHTML=r.llm_options.map(o=>`<option>${o}</option>`).join('')}
+  $('fsum').textContent=`Абонентов ≈ ${r.subscribers_est.toLocaleString('ru-RU')} (оценка из выручки и ARPU) · обращений ≈ ${r.contacts_month.toLocaleString('ru-RU')}/мес · диалог ИИ ${r.chat_dialog_cost_rub} ₽ · внедрение ${mln(r.build_cost)} ₽ · сопровождение ${mln(r.run_month)} ₽/мес на направление`;
+  const ds=[...r.directions].sort((a,b)=>b.effect_year-a.effect_year),mx=Math.max(...ds.map(d=>Math.abs(d.effect_year)));
+  $('ftable').innerHTML='<table><tr><th>Направление и гипотеза</th><th>Освобождено ставок</th><th>Экономия/мес</th><th>ИИ/мес</th><th>Нетто/мес</th><th>Доп. выручка за год</th><th>Эффект за год</th><th>Пессим. / оптим.</th><th>Окупаемость</th><th>Подтверждено источниками</th></tr>'+
+   ds.map(d=>`<tr style="${d.key===r.best?'background:#13301f':d.key===r.worst?'background:#301318':''}"><td><b>${esc(d.title)}</b>${d.key===r.best?' <span class="sev ok">самая доходная</span>':d.key===r.worst?' <span class="sev critical">наименее доходная</span>':''}<div class="ev">${esc(d.hypothesis)}</div></td>
+   <td>${d.fte_freed}</td><td>${rub(d.savings_month)}${d.risk_avoided_month?`<div class="ev">+ риск штрафа ${rub(d.risk_avoided_month)}</div>`:''}</td><td>${rub(d.llm_month+d.other_cost_month)}</td><td>${rub(d.net_month)}</td><td>${rub(d.extra_revenue_year)}</td>
+   <td><b>${mln(d.effect_year)}</b><div style="height:6px;background:${d.effect_year>=0?'var(--ok)':'var(--crit)'};width:${Math.round(Math.abs(d.effect_year)/mx*100)}%;border-radius:3px"></div></td>
+   <td class="ev">${mln(r.scenarios.pessimistic[d.key])} / ${mln(r.scenarios.optimistic[d.key])}</td><td>${d.payback_months!=null?d.payback_months+' мес':'—'}</td><td>${Math.round(d.evidence_share*100)}%</td></tr>`).join('')+'</table>';
+  const A=r.assumptions,inp=(path,v)=>{const k=v.kind==='source'||v.kind==='hh'?'🟢':v.kind==='override'?'🔵':'🟡';return `<tr><td>${k} ${esc(path.split('.').pop())}<div class="ev">${esc(v.note||'')}${v.url?` · <a href="${v.url}" target="_blank" style="color:var(--blue)">источник</a>`:''}</div></td><td><input style="width:110px" value="${v.value}" onchange="FIN_OV['${path}']=parseFloat(this.value)"></td></tr>`};
+  let h='';for(const sec of ['company','build'])h+=`<tr><td colspan=2><b>${sec==='company'?'Компания':'Внедрение'}</b></td></tr>`+Object.entries(A[sec]).filter(([k,v])=>v&&v.value!=null).map(([k,v])=>inp(sec+'.'+k,v)).join('');
+  for(const [dk,d] of Object.entries(A.directions))h+=`<tr><td colspan=2><b>${esc(d.title)}</b></td></tr>`+Object.entries(d).filter(([k,v])=>v&&v.value!=null).map(([k,v])=>inp(`directions.${dk}.${k}`,v)).join('');
+  $('fassump').innerHTML='<table>'+h+'</table>';
+  $('fsal').innerHTML=`<div class="ev">${esc(r.salaries.sources.hh)} · ${esc(r.salaries.date)} · ${esc(r.salaries.method)}</div><table><tr><th>Роль</th><th>Медиана</th><th>P25–P75</th><th>n</th><th>«Работа России»</th></tr>`+Object.entries(r.salaries.roles).map(([k,v])=>`<tr><td>${esc(v.query)}</td><td>${v.hh.median?rub(v.hh.median):'—'}</td><td class="ev">${v.hh.p25?rub(v.hh.p25)+' – '+rub(v.hh.p75):''}</td><td>${v.hh.n}</td><td class="ev">${v.trudvsem.median?rub(v.trudvsem.median)+' (n='+v.trudvsem.n+')':'—'}</td></tr>`).join('')+'</table>'}
+
+api('/api/health').then(h=>$('model').textContent=`${h.provider}: ${h.model}${h.voice?' · голос локально':''}`);load();loadB2b();
+</script>
+</body>
+</html>
