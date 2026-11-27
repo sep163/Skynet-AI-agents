@@ -26,6 +26,22 @@
 - **Каждая сумма — из прайса или расчёта.** Иначе ответ не уходит клиенту.
 - **Голос не уходит в облако.** Диктовка и звонки расшифровываются локально через faster-whisper.
 
+## Агентная архитектура: LangGraph + Langfuse
+
+Поддержка, подключение и B2B работают через один граф LangGraph (`app/graph.py`):
+
+```mermaid
+graph TD
+  START --> agent[agent: шаг модели Claude / Ollama]
+  agent -- вызовы инструментов --> tools[tools: биллинг, линия, слоты, заявки]
+  tools --> agent
+  agent -- ответ готов --> guard[guard: «сказал = сделал» и цены из прайса]
+  guard -- расхождение, 1-я попытка --> agent
+  guard -- ok --> END
+```
+
+**Трассировка.** Ключи `LANGFUSE_*` в `.env` включают Langfuse. В трассе каждого ответа — узлы графа, запросы к модели с токенами, вызовы инструментов с аргументами и результатом; `session_id` — диалог виджета, `user_id` — клиент. Без ключей всё работает так же, только без трасс.
+
 ## Запуск
 
 ```bash
@@ -53,7 +69,7 @@ uvicorn app.main:app --port 8000
 ## Проверка
 
 ```bash
-python -m pytest -q                         # 17 тестов без LLM
+python -m pytest -q                         # 23 теста без LLM, включая граф с поддельной моделью
 python -m scripts.eval_sentinel --seeds 20  # Сентинел: recall 99%, всё раньше первой жалобы, 0 ложных
 python -m scripts.eval_cases comms          # фактчек рекламы: 7/7
 python -m scripts.eval_cases quality onboarding b2b   # на модели из .env
@@ -80,7 +96,9 @@ app/sentinel.py        детекторы и инциденты
 app/ops.py             биллинг (мок), мастера, очередь действий AUTO/APPROVAL
 app/agent.py, tools.py ИИ первой линии
 app/cases/             onboarding · b2b · quality · comms · finmodel · common (проверки «сказал=сделал» и цен)
-app/llm.py             Claude / Ollama, общий агентный цикл
+app/graph.py           граф LangGraph: agent → tools → guard
+app/llm.py             адаптеры Claude / Ollama
+app/tracing.py         Langfuse (включается ключами)
 app/emotion.py voice.py kb.py
 static/widget.js       виджет для сайта · site-demo.html · staff.html
 data/                  плейбуки, базы знаний, прайсы, размеченные диалоги и тексты, предпосылки финмодели

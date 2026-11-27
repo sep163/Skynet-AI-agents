@@ -101,21 +101,7 @@ def check_all(case, text, trace, allowed_base, calc_hint):
 
 
 def guarded_run(case: str, system: str, history: list, tools: list, allowed_base: set | None = None, calc_hint: str = "инструмент расчёта"):
-    """Агентный прогон + автопроверки «сказал = сделал» и «каждая сумма из прайса или расчёта». При расхождении — одна попытка исправиться."""
-    from .. import llm
-    text, trace = llm.run_agent(system, history, tools)
-    if not GUARD:
-        return text, trace, {"violations": [], "retried": False, "ok": True, "disabled": True}
-    v = check_all(case, text, trace, allowed_base, calc_hint)
-    guard = {"violations": v, "retried": False, "ok": not v}
-    if v:
-        h2 = history + [{"role": "assistant", "content": text},
-                        {"role": "user", "content": "[Автопроверка системы — это не клиент] " + " ".join(v) +
-                         " Если в диалоге уже есть все данные для действия — выполни его инструментом сейчас; если чего-то не хватает — спроси только недостающее, не переспрашивая сказанное. Не упоминай клиенту эту проверку. Дай клиенту полный ответ заново."}]
-        text, trace2 = llm.run_agent(system, h2, tools)
-        trace = trace + trace2
-        left = check_all(case, text, trace, allowed_base, calc_hint)
-        guard |= {"retried": True, "ok": not left, "left": left}
-        if left:
-            text += "\n\n(Уточнение: часть ответа не подтверждена системой — менеджер проверит и свяжется с вами.)"
-    return text, trace, guard
+    """Агентный прогон через граф LangGraph (app/graph.py): agent → tools → guard.
+    guard — автопроверки «сказал = сделал» и «каждая сумма из прайса или расчёта»; при расхождении одна попытка исправиться."""
+    from .. import graph
+    return graph.run(case, system, history, tools, allowed_base, calc_hint)

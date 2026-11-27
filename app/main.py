@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import agent, config, emotion, llm, ops as ops_mod, voice
+from . import agent, config, emotion, llm, ops as ops_mod, tracing, voice
 from .cases import b2b, comms, finmodel, onboarding, quality
 from .cases.common import split_next
 from .network import FAULT_KINDS, PARENT, all_ports
@@ -149,7 +149,8 @@ def clients():
 @app.post("/api/chat")
 def chat(x: ChatIn):
     try:
-        res = agent.answer(x.client_id, [m.model_dump() for m in x.messages], x.voice)
+        with tracing.attributes(session_id=x.sid, user_id=x.client_id, tags=["support"]):
+            res = agent.answer(x.client_id, [m.model_dump() for m in x.messages], x.voice)
     except KeyError as e:
         raise HTTPException(404, str(e))
     res |= split_next(res["answer"])
@@ -164,7 +165,8 @@ def widget_chat(x: WidgetIn):
         if not x.client_id:
             raise HTTPException(400, "нужна авторизация клиента")
         return chat(ChatIn(client_id=x.client_id, messages=x.messages, voice=x.voice, sid=x.sid))
-    res = (onboarding.answer if x.mode == "onboarding" else b2b.answer)(h)
+    with tracing.attributes(session_id=x.sid, tags=[x.mode]):
+        res = (onboarding.answer if x.mode == "onboarding" else b2b.answer)(h)
     res["emotion"] = emotion.analyze(h[-1]["content"], x.voice, use_llm=False) if h else None
     log_conv(x.sid, x.mode, x.client_id, h, res)
     return res

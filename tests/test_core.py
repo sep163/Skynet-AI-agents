@@ -65,7 +65,9 @@ def test_emotion_rules():
 def test_api_chat_with_mocked_llm(monkeypatch):
     from app.main import app
     ops_mod.reset()
-    monkeypatch.setattr(llm, "run_agent", lambda s, h, t, max_steps=10: ("ok", [{"tool": t[0].name, "args": {}, "result": t[0].fn()}]))
+    from tests.test_graph import Scripted
+    monkeypatch.setattr(llm, "adapter", lambda: Scripted([llm.Step({"role": "assistant"}, [("1", "get_client_profile", {})], "", "tool_use"),
+                                                          llm.Step({"role": "assistant", "content": "ok"}, [], "ok", "end")]))
     monkeypatch.setattr(emotion.config, "EMOTION_LLM", False)
     c = TestClient(app)
     r = c.post("/api/chat", json={"client_id": "c002", "messages": [{"role": "user", "content": "привет"}]}).json()
