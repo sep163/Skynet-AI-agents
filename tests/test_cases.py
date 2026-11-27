@@ -2,7 +2,7 @@ import json
 
 from app import config
 from app.cases import b2b, comms, finmodel, onboarding
-from app.cases.common import price_check, split_next, violations
+from app.cases.common import money_from, price_check, prices_in, split_next, violations
 
 
 def test_comms_checker_labeled_texts():
@@ -14,6 +14,8 @@ def test_comms_checker_labeled_texts():
 def test_price_check_and_next_block():
     assert price_check("Тариф 690 ₽ и роутер 99 руб", {690.0, 99.0})["ok"]
     assert price_check("Всего 490 ₽", {690.0})["unknown"] == [490.0]
+    assert prices_in("Подключение 1 500 ₽, роутер 4990 ₽, итого 12 000,50 руб") == [1500.0, 4990.0, 12000.5]
+    assert prices_in("за 3 1000 ₽") == [1000.0]
     s = split_next("Готово.\n\nЧто дальше: мастер позвонит за час")
     assert s["body"] == "Готово." and s["next"].startswith("мастер")
 
@@ -56,3 +58,18 @@ def test_finmodel_ranks_and_scenarios():
     assert sc["pessimistic"]["support"] < sc["base"]["support"] < sc["optimistic"]["support"]
     lower = finmodel.compute(overrides={"directions.support.automation_rate": 0.1})
     assert next(d for d in lower["directions"] if d["key"] == "support")["effect_year"] < next(d for d in r["directions"] if d["key"] == "support")["effect_year"]
+
+
+def test_price_check_ignores_speed_and_channels():
+    onboarding.reset()
+    allowed = money_from(onboarding.S.price)
+    assert 690.0 in allowed and 4990.0 in allowed
+    assert not price_check("Тариф «Дом 500» стоит 500 ₽ в месяц", allowed)["ok"]  # 500 — скорость, а не цена
+    assert not price_check("200 каналов за 200 ₽", allowed)["ok"]
+    calc = onboarding.calc("home500", "rent", False, False)
+    assert price_check("Каждый месяц 789 ₽, первый месяц 100 ₽", allowed | money_from(calc))["ok"]
+
+
+def test_comms_does_not_merge_numbers():
+    issues = comms.check("Для 3 1000 ₽ скидка. «Дом 1000» — 890 ₽ в месяц.", "post", "семьи")["issues"]
+    assert [i["msg"] for i in issues if i["type"] == "unknown_price"] == ["цена 1000 ₽ не найдена в прайсе"]

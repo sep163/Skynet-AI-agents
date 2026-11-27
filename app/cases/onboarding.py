@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from .. import config
 from ..kb import get_kb
 from ..llm import Tool
-from .common import guarded_run, load, numbers_from, price_check, slots, split_next
+from .common import guarded_run, load, money_from, price_check, slots, split_next
 
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 ROLE = """Ты — консультант SkyNet по подключению домашнего интернета в чате на сайте. С тобой говорит человек, который ещё не клиент.
@@ -143,8 +143,8 @@ def tools():
 
 def answer(history: list[dict]) -> dict:
     system = f"{ROLE}\n\n{(config.DATA / 'onboarding/playbook.md').read_text(encoding='utf-8')}\n\nСегодня {S.now():%d.%m.%Y}."
-    text, trace, guard = guarded_run("onboarding", system, history, tools(), numbers_from(S.price), "calc_first_payment")
-    allowed = numbers_from(S.price) | numbers_from([t["result"] for t in trace])
+    text, trace, guard = guarded_run("onboarding", system, history, tools(), money_from(S.price), "calc_first_payment")
+    allowed = money_from(S.price) | money_from([t["result"] for t in trace])
     return {"answer": text, **split_next(text), "trace": trace, "trust": price_check(text, allowed), "guard": guard}
 
 

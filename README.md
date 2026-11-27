@@ -1,6 +1,6 @@
 # SkyNet AI: виджет для сайта и внутренний интерфейс для сотрудников
 
-Прототип для хакатона SkyNet (27–29.11.2026). Готовы решения под все пять направлений, команда выбирает одно. Подробно о каждом и об экономике — в [docs/cases.md](docs/cases.md).
+Прототип для хакатона SkyNet (27–29.11.2026). Готовы решения под все пять направлений, команда выбирает одно. Подробно о каждом и об экономике — в [docs/cases.md](docs/cases.md). Результаты проверки — [docs/results.md](docs/results.md), каркас презентации к защите — [docs/presentation.md](docs/presentation.md).
 
 | Направление | Что делает ИИ | Где решает человек |
 |---|---|---|
@@ -53,11 +53,14 @@ uvicorn app.main:app --port 8000
 ## Проверка
 
 ```bash
-python -m pytest -q                         # 15 тестов без LLM
+python -m pytest -q                         # 17 тестов без LLM
 python -m scripts.eval_sentinel --seeds 20  # Сентинел: recall 99%, всё раньше первой жалобы, 0 ложных
 python -m scripts.eval_cases comms          # фактчек рекламы: 7/7
 python -m scripts.eval_cases quality onboarding b2b   # на модели из .env
 python -m scripts.eval_agent                # сценарии поддержки
+python -m scripts.eval_agent --no-guard     # то же без автопроверки «сказал = сделал» — база для сравнения
+python -m scripts.eval_cases onboarding b2b --no-guard
+python -m scripts.results                   # сводка всех отчётов из reports/ → docs/results.md
 python -m app.cases.finmodel                # финмодель по всем направлениям и LLM-провайдерам
 python -m scripts.hh_salaries               # обновить зарплаты (hh.ru, «Работа России»)
 ```

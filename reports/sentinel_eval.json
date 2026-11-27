@@ -1,0 +1,49 @@
+{
+ "seeds": 20,
+ "hours_per_seed": 12.0,
+ "faults": 134,
+ "false_incidents": 0,
+ "false_per_day": 0.0,
+ "by_kind": {
+  "cable_degradation": {
+   "n": 31,
+   "recall": 1.0,
+   "median_lead_vs_complaint_min": 48.0,
+   "median_lead_vs_failure_min": 35.0,
+   "detected_before_first_complaint": 1.0
+  },
+  "congestion": {
+   "n": 29,
+   "recall": 1.0,
+   "median_lead_vs_complaint_min": 14.0,
+   "median_lead_vs_failure_min": -10.0,
+   "detected_before_first_complaint": 1.0
+  },
+  "optic_degradation": {
+   "n": 19,
+   "recall": 1.0,
+   "median_lead_vs_complaint_min": 121.0,
+   "median_lead_vs_failure_min": 117.0,
+   "detected_before_first_complaint": 1.0
+  },
+  "speed_downgrade": {
+   "n": 24,
+   "recall": 1.0,
+   "median_lead_vs_complaint_min": 148.5,
+   "median_lead_vs_failure_min": -3.0,
+   "detected_before_first_complaint": 1.0
+  },
+  "switch_power": {
+   "n": 31,
+   "recall": 0.968,
+   "median_lead_vs_complaint_min": 5.0,
+   "median_lead_vs_failure_min": -2.0,
+   "detected_before_first_complaint": 1.0
+  }
+ },
+ "overall": {
+  "recall": 0.993,
+  "before_first_complaint": 1.0
+ },
+ "false_examples": []
+}

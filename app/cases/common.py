@@ -5,7 +5,11 @@ from datetime import datetime, timedelta
 
 from .. import config
 
-PRICE = re.compile(r"(\d[\d  ]*(?:[.,]\d+)?)\s*(?:₽|руб)", re.I)
+# Число с разделителем тысяч («1 500», «12 000») или без. Соседние числа не склеиваются: «3 1000 ₽» — это 1000.
+NUM = r"(?<![\d.,])((?:\d{1,3}(?:[  ]\d{3})+(?!\d)|\d+)(?:[.,]\d+)?)"
+PRICE = re.compile(NUM + r"\s*(?:₽|руб)", re.I)
+MONEY_KEYS = {"fee", "price", "rub", "monthly", "once", "first_month_fee"}
+GUARD = True  # False — прогон без автопроверок (для сравнения в eval)
 NEXT = re.compile(r"\**Что дальше:?\**:?\s*(.+)$", re.S | re.I)
 
 
@@ -24,16 +28,22 @@ def price_check(text: str, allowed: set[float]) -> dict:
     return {"ok": not unknown, "prices": found, "unknown": unknown}
 
 
-def numbers_from(obj) -> set[float]:
+def _num(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def money_from(obj) -> set[float]:
+    """Только денежные поля (fee, price, rub, *_rub…). Скорость, число каналов и номера слотов ценой не считаются."""
     out = set()
     if isinstance(obj, dict):
-        for v in obj.values():
-            out |= numbers_from(v)
+        for k, v in obj.items():
+            if _num(v) and (k in MONEY_KEYS or k.endswith("_rub")):
+                out.add(float(v))
+            else:
+                out |= money_from(v)
     elif isinstance(obj, list):
         for v in obj:
-            out |= numbers_from(v)
-    elif isinstance(obj, (int, float)) and not isinstance(obj, bool):
-        out.add(float(obj))
+            out |= money_from(v)
     return out
 
 
@@ -84,7 +94,7 @@ def violations(case: str, text: str, trace: list) -> list[str]:
 def check_all(case, text, trace, allowed_base, calc_hint):
     v = violations(case, text, trace)
     if allowed_base is not None:
-        bad = price_check(text, allowed_base | numbers_from([t["result"] for t in trace]))["unknown"]
+        bad = price_check(text, allowed_base | money_from([t["result"] for t in trace]))["unknown"]
         if bad:
             v.append(f"В ответе суммы {', '.join(f'{x:g}' for x in bad)} ₽, которых нет ни в прайсе, ни в расчёте инструмента. Не считай в уме — посчитай через {calc_hint}.")
     return v
@@ -94,6 +104,8 @@ def guarded_run(case: str, system: str, history: list, tools: list, allowed_base
     """Агентный прогон + автопроверки «сказал = сделал» и «каждая сумма из прайса или расчёта». При расхождении — одна попытка исправиться."""
     from .. import llm
     text, trace = llm.run_agent(system, history, tools)
+    if not GUARD:
+        return text, trace, {"violations": [], "retried": False, "ok": True, "disabled": True}
     v = check_all(case, text, trace, allowed_base, calc_hint)
     guard = {"violations": v, "retried": False, "ok": not v}
     if v:

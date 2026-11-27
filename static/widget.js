@@ -69,7 +69,7 @@
     ta.value = ''; const h = state.hist[state.mode] = state.hist[state.mode] || []; h.push({role: 'user', content: text}); add('m u', esc(text));
     const typing = add('typing', 'SkyNet печатает…');
     try {
-      const r = await fetch(API + '/api/widget/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mode: state.mode, messages: h, client_id: state.client, voice: state.voice, sid})}).then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(new Error(e.detail))));
+      const r = await fetch(API + '/api/widget/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mode: state.mode, messages: h, client_id: state.client, voice: state.voice, sid})}).then(r => r.ok ? r.json() : r.json().catch(() => ({})).then(e => Promise.reject(new Error(typeof e.detail === 'string' ? e.detail : 'сервис временно недоступен'))));
       typing.remove(); state.voice = null; h.push({role: 'assistant', content: r.answer}); save();
       add('m a', esc(r.body || r.answer)); cards(r); if (r.next) add('card next', `<h4>➡️ Что дальше</h4>${esc(r.next)}`);
     } catch (e) { typing.textContent = 'Не получилось ответить: ' + e.message + '. Позвоните 8 (812) 386-20-20.' }

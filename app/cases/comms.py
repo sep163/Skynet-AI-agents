@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from .. import llm
-from .common import load
+from .common import NUM, load
 
 router = APIRouter(prefix="/api/comms", tags=["comms"])
 
@@ -46,7 +46,7 @@ def check(text: str, channel: str, segment: str) -> dict:
         m = re.search(f["pattern"], low)
         if m:
             issues.append({"type": "forbidden", "msg": f"«{m.group(0)}» — {f['why']}"})
-    for m in re.finditer(r"(\d[\d  ]*(?:[.,]\d+)?)\s*(₽|руб|мбит|гбит|%|канал)", low):
+    for m in re.finditer(NUM + r"\s*(₽|руб|мбит|гбит|%|канал)", low):
         v, unit = _num(m.group(1)), m.group(2)
         if unit in ("₽", "руб") and v not in a["prices"]:
             issues.append({"type": "unknown_price", "msg": f"цена {m.group(0)} не найдена в прайсе"})

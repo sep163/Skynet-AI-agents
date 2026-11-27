@@ -1,6 +1,7 @@
 """Сценарный eval агента первой линии: правильные инструменты, запрещённые действия, суть ответа.
 
-Запуск: python -m scripts.eval_agent [--only id1,id2] [--judge]
+Запуск: python -m scripts.eval_agent [--only id1,id2] [--judge] [--no-guard]
+--no-guard — без автопроверки «сказал = сделал»: база для сравнения.
 Модель берётся из .env (LLM_PROVIDER / CLAUDE_MODEL) — удобно сравнивать Haiku, Opus и локальный Qwen.
 """
 import argparse
@@ -9,6 +10,7 @@ import re
 import time
 
 from app import agent, config, llm, ops as ops_mod
+from app.cases import common
 
 JUDGE = {"type": "object", "properties": {"score": {"type": "integer", "enum": [1, 2, 3, 4, 5]}, "why": {"type": "string"}},
          "required": ["score", "why"], "additionalProperties": False}
@@ -27,7 +29,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default="")
     ap.add_argument("--judge", action="store_true")
+    ap.add_argument("--no-guard", action="store_true")
     a = ap.parse_args()
+    common.GUARD = not a.no_guard
     cases = json.loads((config.DATA / "eval" / "agent_cases.json").read_text(encoding="utf-8"))
     if a.only:
         cases = [c for c in cases if c["id"] in a.only.split(",")]
@@ -39,7 +43,8 @@ def main():
         o.tick(c["minutes"])
         t0 = time.time()
         res = agent.answer(c["client"], [{"role": "user", "content": c["message"]}])
-        r = {"id": c["id"], "sec": round(time.time() - t0, 1), **check(c, res, o), "emotion": res["emotion"]["level"], "answer": res["answer"]}
+        r = {"id": c["id"], "sec": round(time.time() - t0, 1), **check(c, res, o), "guard_caught": bool(res["guard"]["violations"]),
+             "guard_fixed": bool(res["guard"]["violations"]) and res["guard"]["ok"], "emotion": res["emotion"]["level"], "answer": res["answer"]}
         if a.judge:
             j = llm.complete_json("Ты — руководитель поддержки провайдера. Оцени ответ ИИ-специалиста клиенту по 5-балльной шкале: точность по данным, "
                                   "решение проблемы, отсутствие лишних шагов, тон. Дай короткое обоснование.",
@@ -51,8 +56,13 @@ def main():
               f"{'' if r['answer_ok'] else ' answer?'}{'' if r['handoff_ok'] else ' handoff?'}{' judge=' + str(r['judge']['score']) if a.judge else ''}")
     model = config.CLAUDE_MODEL if config.PROVIDER == "claude" else config.OLLAMA_MODEL
     passed = sum(r["pass"] for r in out)
-    print(f"\n{model}: {passed}/{len(out)} сценариев пройдено")
-    open(f"reports/agent_eval_{model.replace(':', '_')}.json", "w").write(json.dumps({"model": model, "passed": passed, "total": len(out), "cases": out}, ensure_ascii=False, indent=1))
+    caught, fixed = sum(r["guard_caught"] for r in out), sum(r["guard_fixed"] for r in out)
+    note = " без автопроверки" if a.no_guard else f"; автопроверка поймала расхождение в {caught}, исправлено {fixed}"
+    print(f"\n{model}: {passed}/{len(out)} сценариев пройдено{note}")
+    suffix = "_noguard" if a.no_guard else ""
+    open(f"reports/agent_eval_{model.replace(':', '_')}{suffix}.json", "w").write(json.dumps(
+        {"model": model, "guard": not a.no_guard, "passed": passed, "total": len(out), "guard_caught": caught,
+         "guard_fixed": fixed, "cases": out}, ensure_ascii=False, indent=1))
 
 
 if __name__ == "__main__":

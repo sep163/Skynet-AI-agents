@@ -1,0 +1,8 @@
+{
+ "model": "claude-haiku-5-5",
+ "comms": {
+  "passed": 7,
+  "total": 7
+ },
+ "guard": true
+}
