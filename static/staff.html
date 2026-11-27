@@ -40,9 +40,12 @@ textarea{width:100%;min-height:90px}.iss{color:var(--crit);font-size:12.5px}.okc
   <button class="tab" data-t="qa">Качество</button>
   <button class="tab" data-t="comms">Коммуникации</button>
   <button class="tab" data-t="fin">Экономика</button>
-  <span class="badge" id="model" style="margin-left:auto"></span><a class="badge" href="/site-demo.html" target="_blank">Сайт с виджетом ↗</a>
+  <button class="pri" onclick="demoStart()" style="margin-left:auto">▶ Демо-сценарий</button><span class="badge" id="model"></span><a class="badge" href="/site-demo.html" target="_blank">Сайт с виджетом ↗</a>
 </header>
 
+<div id="demo" hidden style="position:sticky;top:46px;z-index:4;margin:12px 12px 0;padding:12px 14px;border-radius:10px;background:#1b2a14;border:1px solid var(--acc)">
+  <div class="row"><b id="demo-t" style="font-size:15px"></b><span class="badge" id="demo-n"></span><span style="margin-left:auto"></span><button class="pri" id="demo-next" onclick="demoNext()">Далее →</button><button onclick="demoStop()">Закрыть</button></div>
+  <div id="demo-d" class="ev" style="font-size:13.5px;margin-top:6px;color:var(--text)"></div><div id="demo-x"></div></div>
 <section id="net" class="two on">
   <div class="col">
     <div class="panel"><h2>Сеть <span class="clock" id="clock"></span></h2>
@@ -193,6 +196,29 @@ async function generate(btn){busy(btn,async()=>{const d=await api('/api/comms/ge
    ${v.check.ok?`<button class="ok" onclick="approve('${d.id}',${i})">Одобрить к отправке</button>`:''}</div>`).join('');loadComms()})}
 async function approve(id,i){await api(`/api/comms/drafts/${id}/approve`,{variant:i});loadComms()}
 async function checkManual(){if(!META)await loadComms();$('mres').innerHTML=chk(await api('/api/comms/check',{text:$('manual').value,channel:$('channel').value,segment:$('segment').value}))}
+
+/* ---- демо-сценарий для защиты ---- */
+const DEMO_CLIENT='c004',DEMO_MSG='Добрый вечер. Интернет сегодня какой-то нестабильный, всё в порядке? Мне завтра работать из дома.';
+let DI=0;const tabTo=t=>document.querySelector(`.tab[data-t="${t}"]`).click();
+const DEMO=[
+ {t:'Обычный день в сети',d:'Сеть SkyNet в норме. Сентинел каждую минуту смотрит телеметрию всех портов, коммутаторов и узлов: ошибки, флапы, скорость, уровень оптики.',run:async()=>{tabTo('net');await resetSim();await step(5)}},
+ {t:'На аплинке дома начинает деградировать оптика',d:'На проспекте Энгельса, 33 (коммутатор sw-04) падает уровень сигнала. Клиенты пока ничего не замечают — жалоб ноль.',run:async()=>{await api('/api/sim/inject',{kind:'optic_degradation',target:'sw-04'});await step(5)}},
+ {t:'Сентинел видит тренд и предсказывает отказ',d:'Через 25 минут по тренду понятно, когда дом погаснет. Инцидент открыт до первой жалобы, выезд бригады ВОЛС уже подобран в слот до отказа и ждёт диспетчера.',run:async()=>{await step(25)}},
+ {t:'Клиент из этого дома пишет в чат на сайте',d:'Пётр Волков, пр. Энгельса, 33: «'+DEMO_MSG+'»',run:async()=>{
+   $('demo-x').innerHTML='<div class="brief">ИИ думает…</div>';
+   const r=await api('/api/chat',{client_id:DEMO_CLIENT,messages:[{role:'user',content:DEMO_MSG}],sid:'demo'});
+   $('demo-x').innerHTML=`<div class="m user">${esc(DEMO_MSG)}</div><div class="m assistant">${esc(r.answer)}</div><div class="ev">Инструменты: ${esc(r.trace.map(x=>x.tool).join(' → '))} · тон клиента ${r.emotion.level}/3${r.guard&&!r.guard.ok?' · автопроверка исправила ответ':''}</div>`}},
+ {t:'Диспетчер одобряет выезд одной кнопкой',d:'ИИ всё подготовил сам: причина, прогноз отказа, мастер, слот. Человек только принимает решение.',run:async()=>{
+   const a=S.actions.find(a=>a.status==='pending'&&a.type==='dispatch_technician');if(a)await decide(a.id,true);$('demo-x').innerHTML=a?`<div class="okc">✔ Одобрено: ${esc(a.title)}</div>`:'<div class="iss">Выезд не найден</div>'}},
+ {t:'Бригада заменила SFP — инцидент закрыт',d:'Дом так и не погас: проблему решили до того, как её заметили 24 абонента дома.',run:async()=>{
+   await load();const j=S.jobs.find(j=>j.status==='confirmed'&&j.incident_id);if(j)await complete(j.id);await step(20);$('demo-x').innerHTML=''}},
+ {t:'Итог',d:'Жалоб — 0. Звонков в поддержку — 0. Отказа — не было. Клиент получил честный ответ с первого сообщения. Дальше: вкладки «Диалоги», «Качество» и «Экономика».',run:async()=>{}},
+];
+async function demoStart(){DI=0;$('demo').hidden=false;await demoShow()}
+async function demoShow(){const s=DEMO[DI];$('demo-t').textContent=s.t;$('demo-d').textContent=s.d;$('demo-n').textContent=`шаг ${DI+1} из ${DEMO.length}`;$('demo-x').innerHTML='';
+  $('demo-next').disabled=true;try{await s.run()}catch(e){$('demo-x').innerHTML=`<div class="iss">Ошибка: ${esc(e.message)}</div>`}$('demo-next').disabled=false;$('demo-next').textContent=DI===DEMO.length-1?'Готово':'Далее →'}
+async function demoNext(){if(DI===DEMO.length-1)return demoStop();DI++;await demoShow()}
+function demoStop(){$('demo').hidden=true}
 
 /* ---- экономика ---- */
 let FIN_OV={};const mln=n=>(n/1e6).toLocaleString('ru-RU',{maximumFractionDigits:1})+' млн';

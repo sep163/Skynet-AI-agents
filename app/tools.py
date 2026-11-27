@@ -27,8 +27,16 @@ def support_tools(ops, cid: str) -> list[Tool]:
         incs = ops.sentinel.for_port(port)
         ids = {i["id"] for i in incs}
         return _clean({"incidents": [{k: i.get(k) for k in ("id", "title", "severity", "status", "level", "detected_at", "evidence", "recommendation", "eta_failure_min")} for i in incs],
-                       "planned_visits": [j for j in ops.jobs if j["client_id"] == cid or j["incident_id"] in ids if j["status"] in ("tentative", "confirmed")],
+                       "planned_visits": [visit(j) for j in ops.jobs if j["client_id"] == cid or j["incident_id"] in ids if j["status"] in ("tentative", "confirmed")],
                        "notifications_sent": [n for n in ops.notifications if n["client_id"] == cid][-3:]})
+
+    def when(t):
+        d = (t.date() - ops.net.t.date()).days
+        return f"{'сегодня' if d == 0 else 'завтра' if d == 1 else t.strftime('%d.%m')} {t:%H:%M}"
+
+    def visit(j):
+        return {"мастер": j["tech"], "когда": f"{when(j['start'])}–{j['end']:%H:%M}", "причина": j["reason"],
+                "статус": "предварительно, ждёт подтверждения диспетчера" if j["status"] == "tentative" else "подтверждён"}
 
     def slots():
         return _clean([{"index": i, "start": s["start"], "end": s["end"], "tech": s["tech"]} for i, s in enumerate(ops.free_slots("cable", PARENT[port.split("/")[0]]))])
