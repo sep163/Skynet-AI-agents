@@ -10,14 +10,15 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import agent, config, emotion, llm, ops as ops_mod, tracing, voice
-from .cases import b2b, comms, finmodel, onboarding, quality, review, sales
+from .cases import b2b, comms, experiments, finmodel, onboarding, quality, review, sales
 from .cases.common import split_next
 from .network import FAULT_KINDS, PARENT, all_ports
 from .tools import _clean
 
 app = FastAPI(title="SkyNet AI: виджет для сайта + внутренний интерфейс")
 app.add_middleware(CORSMiddleware, allow_origins=os.getenv("WIDGET_ORIGINS", "*").split(","), allow_methods=["*"], allow_headers=["*"])
-for r in (onboarding.router, b2b.router, quality.router, comms.router, finmodel.router, sales.router, review.router):
+experiments.seed_demo()
+for r in (onboarding.router, b2b.router, quality.router, comms.router, finmodel.router, sales.router, review.router, experiments.router):
     app.include_router(r)
 CONVERSATIONS: dict[str, dict] = {}
 

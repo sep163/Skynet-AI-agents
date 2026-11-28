@@ -42,6 +42,7 @@ textarea{width:100%;min-height:90px}.iss{color:var(--crit);font-size:12.5px}.okc
   <button class="tab" data-t="rop">Супервайзер</button>
   <button class="tab" data-t="ropsum">РОП: сводка</button>
   <button class="tab" data-t="mgr">Кабинет менеджера</button>
+  <button class="tab" data-t="ab">A/B-тесты</button>
   <button class="tab" data-t="fin">Экономика</button>
   <button class="pri" onclick="demoStart()" style="margin-left:auto">▶ Демо-сценарий</button><span class="badge" id="model"></span><a class="badge" href="/site-demo.html" target="_blank">Сайт с виджетом ↗</a>
 </header>
@@ -139,8 +140,28 @@ textarea{width:100%;min-height:90px}.iss{color:var(--crit);font-size:12.5px}.okc
   <div class="panel"><h2>Калибровка агрессии под оценки людей <span class="ev">люди оценивают по-разному — модель подгоняется под среднее</span></h2><div id="rscal"></div></div>
 </section>
 
+<section id="ab">
+  <div class="panel"><h2>A/B-тесты подходов по типам клиентов <span class="ev">тестируем одну фразу для одного типа клиента; каждый менеджер работает в обоих вариантах блоками по 2–3 дня; звонки попадают в тест сами после разбора</span></h2><div id="ablist"></div></div>
+  <div class="panel" id="abcard-p" hidden><h2 id="abcard-h"></h2><div id="abcard"></div></div>
+  <div class="two" style="display:grid;gap:12px">
+    <div class="panel"><h2>Новый тест <span class="ev">завести может аналитик, супервайзер, РОП; предложение менеджера запускает РОП</span></h2>
+      <div class="row"><input id="abt" placeholder="Название" style="flex:1"><select id="abrole"><option value="analyst">аналитик</option><option value="supervisor">супервайзер</option><option value="rop">РОП</option><option value="manager">менеджер</option></select><input id="abauth" placeholder="Кто" style="width:140px"></div>
+      <div class="row" style="margin-top:6px">Тип клиента: <select id="abseg"></select> Ситуация: <select id="abtrig"><option value="any">любой звонок этого типа</option></select></div>
+      <textarea id="abhyp" placeholder="Гипотеза: почему эта фраза должна сработать" style="min-height:46px;margin-top:6px"></textarea>
+      <input id="aba" placeholder="Вариант A (контроль): как работаем сейчас" style="width:100%;margin-top:6px">
+      <textarea id="abb" placeholder="Вариант B: фраза, которую проверяем — дословно, как скажет менеджер" style="min-height:46px;margin-top:6px"></textarea>
+      <input id="abkw" placeholder="Ключевые слова через запятую (необязательно): по ним разбор найдёт фразу, если менеджер скажет её своими словами" style="width:100%;margin-top:6px">
+      <div class="row" style="margin-top:6px">Минимальный эффект <input id="abmde" value="10" style="width:50px"> п.п. · блок <select id="abblk"><option>2</option><option>3</option><option>1</option></select> дн. · длительность <input id="abdays" value="6" style="width:50px"> дн.
+        <button class="pri" onclick="abCreate()">Создать</button><span id="abok" class="okc"></span></div></div>
+    <div class="panel"><h2>Планировщик: сколько дней нужно тесту</h2>
+      <div class="row">Менеджеров <input id="plm" value="12" style="width:50px"> звонков в день <input id="plc" value="100" style="width:60px"> эффект <input id="ple" value="10" style="width:45px"> п.п. применяют фразу <input id="pla" value="70" style="width:45px">% блок <select id="plb"><option>2</option><option>3</option></select><button onclick="abPlan()">Посчитать</button></div><div id="abplan"></div></div>
+  </div>
+  <div class="panel"><h2>Типы клиентов и что им можно предложить <span class="ev">победитель теста становится стандартом для своего типа</span></h2><div id="ablib"></div></div>
+</section>
+
 <section id="mgr" class="two">
   <div class="col"><div class="panel"><h2>Кабинет менеджера <select id="mname" onchange="mgrLoad()"></select></h2><div id="mstats"></div></div>
+    <div class="panel"><h2>Мои тесты сегодня <input type="date" id="mabday" value="2026-11-24" onchange="mgrAb()"></h2><div id="mab"></div></div>
     <div class="panel"><h2>Мои звонки</h2><div id="mcalls"></div></div></div>
   <div class="col"><div class="panel"><h2>Тренажёр: потренируйся на ИИ-клиенте</h2><div id="mpr"></div><div id="mprs" hidden>
       <div id="mprt" class="badge"></div><div id="mprd" style="max-height:360px;overflow:auto;margin:6px 0"></div>
@@ -169,7 +190,7 @@ const KL={cable_degradation:'Деградация кабеля',speed_downgrade:
 const api=async(u,b)=>{const r=await fetch(u,{method:b?'POST':'GET',headers:b instanceof FormData?{}:{'Content-Type':'application/json'},body:b instanceof FormData?b:b?JSON.stringify(b):undefined});if(!r.ok)throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail);return r.json()};
 const tm=s=>s?String(s).replace('T',' ').slice(5,16):'',esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])),rub=n=>Number(n).toLocaleString('ru-RU')+' ₽';
 const busy=async(btn,f)=>{const t=btn.textContent;btn.disabled=true;btn.textContent='ИИ думает…';try{await f()}catch(e){alert(e.message)}btn.disabled=false;btn.textContent=t};
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,section').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.t).classList.add('on');({conv:loadConv,onb:loadOnb,b2b:loadB2b,qa:loadQa,comms:loadComms,fin:loadFin,rop:ropLoad,ropsum:ropSum,mgr:mgrLoad}[b.dataset.t]||(()=>{}))()});
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,section').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.t).classList.add('on');({conv:loadConv,onb:loadOnb,b2b:loadB2b,qa:loadQa,comms:loadComms,fin:loadFin,rop:ropLoad,ropsum:ropSum,mgr:mgrLoad,ab:abLoad}[b.dataset.t]||(()=>{}))()});
 
 /* ---- пульт сети ---- */
 async function load(){S=await api('/api/state');render()}
@@ -353,7 +374,9 @@ async function mgrLoad(){const cs=await api('/api/sales/calls'),d0=await api('/a
   $('mstats').innerHTML=me?'<table><tr><th>Этап</th><th>Я</th><th>Команда</th></tr>'+d0.stages.filter(s=>me.stages[s.id]!=null).map(s=>`<tr><td>${esc(s.name)}</td><td>${pc(me.stages[s.id])}</td><td>${pc(team[s.id]?.avg)}</td></tr>`).join('')+`</table><div class="ev">Конверсия: ${Math.round(me.conversion*100)}% · звонков: ${me.calls}</div>`:'<div class="ev">Звонки ещё не разобраны</div>';
   $('mcalls').innerHTML=mine.map(c=>`<div class="card" style="cursor:pointer" onclick='mgrCall(${JSON.stringify(c.id)})'><div class="t"><b>${c.id}</b><span class="badge">${esc(c.script_name)}</span><span class="badge">${esc(c.outcome)}</span>${c.result?pc(c.result.total):'<span class="badge">не разобран</span>'}</div>${c.result?`<div class="ev">Зоны риска: ${c.result.risk_zones.map(z=>esc((d0.stages.find(s=>s.id===z)||{name:'тон'}).name)).join(', ')||'нет'}</div>`:''}</div>`).join('');
   const fs=await api(`/api/sales/feedback?manager=${encodeURIComponent(m)}`);$('mfeed').innerHTML=fs.map(f=>fbHtml(f)+`<div class="row" style="margin:-2px 0 8px">${f.status!=='прочитано'?`<button onclick="mgrRead('${f.id}')">Прочитал</button>`:''}${f.author!=='Тренажёр'&&f.kind!=='спор'?`<span class="ev">Полезно?</span><button onclick="useful('${f.id}',true,this)">👍</button><button onclick="useful('${f.id}',false,this)">👎</button>`:''}</div>`).join('')||'<div class="ev">Обратной связи пока нет</div>';window.MC=cs;
-  dispList(await api('/api/review/disputes?manager='+encodeURIComponent(m)),'mdisp','manager')}
+  dispList(await api('/api/review/disputes?manager='+encodeURIComponent(m)),'mdisp','manager');mgrAb()}
+async function mgrAb(){const t=await api(`/api/experiments/today?manager=${encodeURIComponent($('mname').value)}&day=${$('mabday').value}`);
+  $('mab').innerHTML=t.map(x=>`<div class="card"><div class="t"><span class="sev ${x.arm==='B'?'ok':'warning'}">вариант ${x.arm}</span><b>${esc(x.title)}</b></div><div class="ev">Клиенты: ${x.segments.map(esc).join(', ')}</div><div class="brief">${esc(x.do)}</div></div>`).join('')||'<div class="ev">Сегодня ты не участвуешь в тестах</div>'}
 async function useful(id,u,btn){await api('/api/review/useful',{feedback_id:id,useful:u,who:$('mname').value});btn.parentElement.innerHTML='<span class="okc">✔ спасибо, учтём</span>'}
 async function mgrRead(id){await api(`/api/sales/feedback/${id}/read`,{});mgrLoad()}
 function mgrCall(id){const c=MC.find(x=>x.id===id),r=c.result;$('mcall').innerHTML=c.dialog.map(([ro,t])=>`<div class="m ${ro==='client'?'user':'assistant'}"><b>${ro==='client'?'Клиент':'Я'}:</b> ${esc(t)}</div>`).join('')+(r?`<div class="ev">Клиент: ${esc(r.client_state)} · итог: ${esc(r.outcome_reason)}</div><table>${r.stages.map(s=>`<tr><td><span class="sc sc${s.score}">${s.score}</span> ${esc(s.id)}</td><td class="ev">${s.mistake?'✘ '+esc(s.mistake)+(s.better?'<br>→ '+esc(s.better):''):'✔'}</td></tr>`).join('')}</table>${r.missed_signals.length?`<div class="iss">Пропущено: ${r.missed_signals.map(esc).join('; ')}</div>`:''}`:'');$('mrev').innerHTML='';if(r)revBox(id,'manager',c.manager,'mrev')}
@@ -398,6 +421,41 @@ async function ropReview(){const q=await api('/api/review/disputes?status=rop');
    <div class="two" style="display:grid;gap:10px;margin-top:6px"><div><b>Нужна оценка РОП</b> <span class="ev">люди сильно расходятся или правила далеко от людей</span>${C.contested.map(x=>`<div class="card"><div class="t"><b>${x.call_id} · ${esc(x.manager)}</b><span class="ev">правила ${x.rules} · люди ${x.human} (разброс ${x.spread}) · калибровка ${x.calibrated}</span><button onclick="$('rsvcall').value='${x.call_id}';revBox('${x.call_id}','rop',ROPN,'rsv')">Оценить</button></div><div class="ev">${Object.entries(x.ratings).map(([k,v])=>esc(k)+': '+v).join(' · ')}</div></div>`).join('')||'<div class="okc">Спорных нет</div>'}</div>
    <div><b>Личная чувствительность к агрессии</b> <span class="ev">не оценка сотрудника: учитывается, когда человек оспаривает тон</span><table>${C.raters.map(r=>`<tr><td>${esc(r.rater)}</td><td>${r.bias>0?'+':''}${r.bias}</td><td class="ev">${esc(r.reading)}</td></tr>`).join('')}</table>
    <div class="ev" style="margin-top:6px">Поправка к правилам по признакам: ${Object.entries(C.weights_named).filter(([k,v])=>v).map(([k,v])=>`${esc(k)} ${v>0?'+':''}${v}`).join(', ')}. Звук (перебивания, повышение голоса) включается на стереозаписях.</div></div></div>`:`<div class="ev">Мало оценок для калибровки: ${C.n_calls} звонков, нужно от 6</div>`}
+
+/* ---- A/B-тесты подходов ---- */
+let LIBR=null;const ST={collecting:'warning',b_wins:'ok',a_wins:'critical',no_diff:'warning',guardrail:'critical'};const EXS={draft:'черновик',proposed:'предложено менеджером',running:'идёт',finished:'завершён'};
+const pp=v=>v==null?'—':(v>0?'+':'')+(v*100).toFixed(1)+' п.п.',pr=v=>v==null?'—':Math.round(v*100)+'%';
+async function abLoad(){LIBR=await api('/api/experiments/library');
+  if(!$('abseg').options.length){$('abseg').innerHTML=Object.entries(LIBR.segments).map(([k,v])=>`<option value="${k}">${esc(v.name)}</option>`).join('');$('abtrig').innerHTML+='<option value="price">возражение «дорого»</option><option value="think">«подумаю»</option><option value="has_provider">«уже есть провайдер»</option><option value="distrust">«не доверяю»</option>'}
+  $('ablib').innerHTML='<table><tr><th>Тип клиента</th><th>Как узнаём</th><th>Доля звонков*</th><th>Успех сейчас*</th><th>Что можно предложить</th><th>Стандарт</th></tr>'+Object.entries(LIBR.segments).map(([k,v])=>`<tr><td><b>${esc(v.name)}</b><div class="ev">${esc(LIBR.metrics[v.metric])}</div></td><td class="ev">${esc(v.how)}</td><td>${pr(v.share)}</td><td>${pr(v.baseline)}</td><td>${v.offers.map(o=>`<div class="row"><span>${esc(o)}</span><button onclick="abPre('${k}',this.previousElementSibling.textContent)" style="padding:1px 8px">→ тест</button></div>`).join('')}</td><td>${LIBR.standards.filter(x=>x.segment===k).map(x=>`<div class="okc">«${esc(x.phrase)}» <span class="ev">${x.exp}, ${pp(x.effect)}</span></div>`).join('')||'<span class="ev">—</span>'}</td></tr>`).join('')+'</table><div class="ev">* допущения для планирования, заменяются замером в первую неделю</div>';
+  const L=await api('/api/experiments');$('ablist').innerHTML='<table><tr><th>Тест</th><th>Тип клиента</th><th>Статус</th><th>Главная оценка B − A</th><th>Собрано / нужно на вариант</th><th>Вывод</th><th></th></tr>'+L.map(e=>`<tr style="cursor:pointer" onclick="abOpen('${e.id}')"><td><b>${e.id}</b> ${esc(e.title)}<div class="ev">${esc(e.author)} · ${esc(e.role)}</div></td><td>${e.segment_names.map(esc).join(', ')}</td><td>${EXS[e.status]}</td><td>${pp(e.summary.itt.diff)}${e.summary.itt.p!=null?` <span class="ev">p=${e.summary.itt.p}</span>`:''}</td><td>${e.summary.have_per_arm} / ${e.summary.need_per_arm}</td><td><span class="sev ${ST[e.summary.status]}">${esc(e.summary.verdict)}</span></td><td>${['draft','proposed'].includes(e.status)?`<button class="ok" onclick="event.stopPropagation();abStart('${e.id}')">Запустить</button>`:''}</td></tr>`).join('')+'</table>';abPlan()}
+function abPre(seg,offer){$('abseg').value=seg;$('abt').value=offer[0].toUpperCase()+offer.slice(1);$('abb').focus();$('abb').placeholder='Фраза для подхода «'+offer+'» — дословно'}
+async function abCreate(){try{const e=await api('/api/experiments',{title:$('abt').value||'Без названия',segments:[$('abseg').value],trigger:$('abtrig').value,a_text:$('aba').value||'как обычно',b_phrase:$('abb').value,
+  b_keywords:$('abkw').value.trim()?$('abkw').value.split(',').map(x=>x.trim()).filter(Boolean):null,min_effect:(+$('abmde').value||10)/100,block_days:+$('abblk').value,days:+$('abdays').value,author:$('abauth').value||'Аналитик',role:$('abrole').value,hypothesis:$('abhyp').value});
+  $('abok').textContent='✔ '+e.id+(e.status==='proposed'?' — ждёт запуска РОП':' — запустите, когда будете готовы');abLoad()}catch(e){alert(e.message)}}
+async function abStart(id){await api(`/api/experiments/${id}/start`,{day:new Date().toISOString().slice(0,10),author:'РОП'});abLoad()}
+async function abPlan(){const P=await api(`/api/experiments/plan?managers=${$('plm').value}&calls_per_day=${$('plc').value}&min_effect=${(+$('ple').value)/100}&adherence=${(+$('pla').value)/100}&block_days=${$('plb').value}`);
+  $('abplan').innerHTML='<table><tr><th>Тип клиента</th><th>Звонков в день</th><th>Нужно на вариант</th><th>Дней</th></tr>'+P.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.per_day}</td><td>${r.need_per_arm}</td><td>${r.fits_week?'<span class="okc">'+r.days+' ✔ укладывается в неделю</span>':'<span class="iss">'+r.days+'</span>'}</td></tr>`).join('')+'</table><div class="ev">Дни округлены до целых циклов A + B. Если фразу применяют реже, срок растёт квадратично: вдвое реже — вчетверо дольше.</div>'}
+async function abOpen(id){const E=await api('/api/experiments/'+id),A=E.analysis,a=A.arms,sc=E.schedule;$('abcard-p').hidden=false;$('abcard-h').textContent=E.id+' · '+E.title;
+  const row=(t,k,f)=>`<tr><td>${t}</td><td>${f(a.A,k)}</td><td>${f(a.B,k)}</td></tr>`,cnt=(x,k)=>x[k],rt=(x,k)=>`${x[k]} <span class="ev">${pr(x.rates[k])}</span>`;
+  $('abcard').innerHTML=`<div class="row"><span class="sev ${ST[A.status]}">${esc(A.verdict)}</span><span class="badge">${E.segment_names.map(esc).join(', ')}</span><span class="badge">метрика: ${esc(E.metric_name)}</span><span class="badge">блоки по ${E.block_days} дн., ${E.days} дн.</span><span class="badge">источник: ${A.sources.map(esc).join(', ')}</span>${E.status==='running'?`<button onclick="abFinish('${E.id}')">Завершить тест</button>`:''}</div>
+   ${E.hypothesis?`<div class="brief">Гипотеза: ${esc(E.hypothesis)}</div>`:''}${E.sim?`<div class="ev">⚠ ${esc(E.sim.note)} (+${Math.round(E.sim.true_effect*100)} п.п. для тех, кто применил фразу)</div>`:''}
+   <div class="two" style="display:grid;gap:10px;margin-top:8px"><div>
+   <div class="card"><b>A:</b> ${esc(E.variants.A.text)}<br><b>B:</b> «${esc(E.variants.B.phrase)}»</div>
+   <div class="card"><b>Воронка</b><table><tr><th></th><th>A</th><th>B</th></tr>${row('Звонков этого типа','calls',cnt)}${row('Ситуация возникла','situation',cnt)}${row('Фраза B применена','applied',rt)}${row('Ближайший итог','success',rt)}<tr><td>Итог в CRM <span class="ev">(где уже известен)</span></td><td>${a.A.crm_success}/${a.A.crm_known} <span class="ev">${pr(a.A.rates.crm)}</span></td><td>${a.B.crm_success}/${a.B.crm_known} <span class="ev">${pr(a.B.rates.crm)}</span></td></tr>${row('Защитная: клиент враждебен или давление','guardrail',rt)}</table></div>
+   <div class="card"><b>Оценки</b><table>
+    <tr><td><b>Главная</b>: все, кому назначен вариант, с разбивкой по менеджеру и циклу</td><td><b>${pp(A.itt.diff)}</b>${A.itt.ci?` <span class="ev">[${pp(A.itt.ci[0])}; ${pp(A.itt.ci[1])}], p=${A.itt.p}</span>`:''}</td></tr>
+    <tr><td>Эффект самой фразы = главная / разница в применении (${pp(A.applied_gap)})</td><td>${pp(A.phrase_effect)}</td></tr>
+    <tr><td class="ev">Только где применили (справочно, завышена: применяют чаще сильные)</td><td class="ev">${pp(A.per_protocol)}</td></tr>
+    <tr><td>Защитная метрика B − A</td><td>${pp(A.guardrail_test.diff)}${A.guardrail_test.p!=null?` <span class="ev">p=${A.guardrail_test.p}</span>`:''}</td></tr>
+    <tr><td>Собрано / нужно ситуаций на вариант</td><td>${A.have_per_arm} / ${A.need_per_arm} <span class="ev">(~${A.per_day_per_arm} в день)</span></td></tr></table>
+    ${A.warnings.map(w=>`<div class="iss">⚠ ${esc(w)}</div>`).join('')}</div>
+   </div><div>
+   <div class="card"><b>Расписание</b> <span class="ev">половина отдела начинает с A, половина с B</span><table><tr><th></th>${sc.days.map(d=>`<th>${d.slice(8)}.${d.slice(5,7)}</th>`).join('')}</tr>${sc.rows.map(r=>`<tr><td>${esc(r.manager)}</td>${r.arms.map(x=>`<td style="text-align:center;background:${x==='B'?'#1d5c3b':'#26304a'}">${x}</td>`).join('')}</tr>`).join('')}</table></div>
+   <div class="card"><b>По менеджерам</b><table><tr><th>Менеджер</th><th>A: итог</th><th>B: итог</th><th>B: применяет фразу</th></tr>${A.managers.map(m=>`<tr><td>${esc(m.manager)}</td><td>${pr(m.A.success)} <span class="ev">${m.A.n}</span></td><td>${pr(m.B.success)} <span class="ev">${m.B.n}</span></td><td>${m.B.applied==null?'—':m.B.applied<0.5?`<span class="iss">${pr(m.B.applied)}</span>`:pr(m.B.applied)}</td></tr>`).join('')}</table><div class="ev">Кто редко применяет фразу — кандидат на тренажёр, а не повод считать фразу плохой</div></div>
+   ${A.examples.length?`<div class="card"><b>Как фразу сказали в звонках</b>${A.examples.map(x=>`<div class="ev">${x.call_id} · ${esc(x.manager)}: «${esc(x.quote)}» ${x.success?'✔':'✘'}</div>`).join('')}</div>`:''}
+   </div></div>`;$('abcard-p').scrollIntoView({behavior:'smooth'})}
+async function abFinish(id){const e=await api(`/api/experiments/${id}/finish`,{author:'РОП'});alert('Итог: '+e.result.verdict);abLoad();abOpen(id)}
 
 /* ---- экономика ---- */
 let FIN_OV={};const mln=n=>(n/1e6).toLocaleString('ru-RU',{maximumFractionDigits:1})+' млн';

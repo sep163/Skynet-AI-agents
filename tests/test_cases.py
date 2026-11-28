@@ -239,3 +239,76 @@ def test_precedents_reach_llm_prompt(monkeypatch, tmp_path):
     with __import__("pytest").raises(RuntimeError):
         sales.analyze(sales.S.calls[0])
     assert "запись без даты" in seen["sys"]
+
+
+def _exps(monkeypatch, tmp_path):
+    from app.cases import experiments as E
+    monkeypatch.setattr(E, "PATH", tmp_path / "e.json")
+    E.reset()
+    return E
+
+
+def test_ab_schedule_crossover_and_today(monkeypatch, tmp_path):
+    E = _exps(monkeypatch, tmp_path)
+    e = E.create(E.ExpIn(title="t", segments=["tech_loyal"], b_phrase="мастер будет завтра с 10 до 12", author="a", managers=E.DEMO_MANAGERS))
+    assert e["status"] == "draft"
+    assert E.create(E.ExpIn(title="m", segments=["price"], b_phrase="посчитаем годовую оплату", author="Денис", role="manager"))["status"] == "proposed"
+    E.start(e["id"], "2026-11-23")
+    sc = E.schedule(e)
+    starts = [r["arms"][0] for r in sc["rows"]]
+    assert starts.count("A") == starts.count("B") == 6
+    assert all(r["arms"] == [r["arms"][0]] * 2 + [{"A": "B", "B": "A"}[r["arms"][0]]] * 2 + [r["arms"][0]] * 2 for r in sc["rows"])
+    assert E.arm_of(e, "Анна Котова", "2026-11-29") is None and E.today("Анна Котова", "2026-11-23")[0]["arm"] in "AB"
+
+
+def test_ab_phrase_detection_and_segments(monkeypatch, tmp_path):
+    E = _exps(monkeypatch, tmp_path)
+    call = {"dialog": [["client", "Опять пропал интернет, третий день"], ["agent", "Вижу линию: мастер приедет завтра с 10 до 12, начислю компенсацию за эти дни"]],
+            "script": "inbound_b2c"}
+    assert E.phrase_used(call, "Мастер будет завтра с 10 до 12, за дни без связи начислю компенсацию")["used"]
+    assert not E.phrase_used(call, "Давайте посчитаем годовую оплату со скидкой")["used"]
+    assert E.phrase_used(call, "что угодно", keywords=["компенсац", "завтра"])["used"]
+    assert E.segment(call, None) == "tech_loyal"
+    assert E.segment({"dialog": [["client", "Хочу расторгнуть договор, ухожу к другому"]], "script": "inbound_b2c"}, None) == "leaving"
+    assert E.segment({"dialog": [["client", "А роутер нужен свой?"]], "script": "inbound_b2c"}, None) == "new"
+
+
+def test_ab_analysis_stratified_effect_and_adherence(monkeypatch, tmp_path):
+    E = _exps(monkeypatch, tmp_path)
+    e = E.create(E.ExpIn(title="t", segments=["tech_loyal"], b_phrase="мастер будет завтра с 10 до 12", author="a", managers=E.DEMO_MANAGERS, min_effect=0.12))
+    E.start(e["id"], "2026-11-23")
+    E.simulate(e, 100, true_effect=0.12)
+    a = E.analyze(e)
+    assert a["status"] == "b_wins" and a["itt"]["strata"] == 12 and 0.05 < a["itt"]["diff"] < 0.17
+    assert a["applied_gap"] > 0.5 and abs(a["phrase_effect"] - 0.12) < 0.06
+    E.simulate(e, 100, true_effect=0.0)
+    assert E.analyze(e)["status"] in ("no_diff", "collecting")
+    f = E.finish(e["id"])
+    assert f["status"] == "finished" and not E.X["standards"]
+    # без применения фразы тест предупреждает, что проверяет не фразу
+    e2 = E.create(E.ExpIn(title="t2", segments=["new"], b_phrase="два времени монтажа на выбор", author="a", managers=E.DEMO_MANAGERS))
+    E.start(e2["id"], "2026-11-23")
+    E.X["events"] = [ev | {"applied": False} if ev["exp"] == e["id"] else ev for ev in E.X["events"]]
+    E.simulate(e2, 30, true_effect=0.1)
+    E.X["events"] = [ev | {"applied": False} for ev in E.X["events"] if ev["exp"] == e2["id"]]
+    assert any("почти не проверяет" in w for w in E.analyze(e2)["warnings"])
+
+
+def test_ab_stratified_math():
+    from app.cases import experiments as E
+    r = E.stratified([(30, 100, 20, 100), (30, 100, 20, 100)])
+    assert r["diff"] == 0.1 and r["p"] < 0.05 and r["ci"][0] > 0
+    assert E.stratified([(5, 10, 0, 0)])["strata"] == 0
+    assert 540 < E.need_per_arm(0.30, 0.38) < 560
+
+
+def test_ab_ingest_from_analysis(monkeypatch, tmp_path):
+    sales = _fake_sales(monkeypatch, tmp_path)
+    E = _exps(monkeypatch, tmp_path)
+    e = E.create(E.ExpIn(title="t", segments=["tech_loyal", "new"], b_phrase="Записать вас на монтаж? Есть завтра с 10 до 12", author="a",
+                         managers=["Анна Котова"], days=6))
+    E.start(e["id"], "2026-11-23")
+    c = next(x for x in sales.S.calls if x["id"] == "S01")
+    ev = E.ingest_call(c, sales.S.results["S01"], sales.S.script)
+    assert ev and ev[0]["applied"] and ev[0]["success"] and ev[0]["segment"] == "new" and ev[0]["source"] == "разбор звонка"
+    assert E.ingest_call(c, sales.S.results["S01"]) and len([x for x in E.X["events"] if x["call_id"] == "S01"]) == 1

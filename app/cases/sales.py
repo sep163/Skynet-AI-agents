@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from .. import config, llm
-from . import quality, review
+from . import experiments, quality, review
 from .common import load, money_from, price_check
 
 router = APIRouter(prefix="/api/sales", tags=["sales"])
@@ -401,6 +401,7 @@ def analyze_call(cid: str) -> dict:
     rebuild()
     r = S.results[cid]
     auto_feedback(call, r)
+    experiments.ingest_call(call, r, S.script)
     _save()
     _mt.update({CACHE: CACHE.stat().st_mtime, FEEDBACK: FEEDBACK.stat().st_mtime})
     return r
