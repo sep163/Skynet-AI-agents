@@ -46,6 +46,15 @@ S = State()
 _mt = {}
 
 
+def _seed_feedback():
+    """На чистой копии репозитория лента обратной связи собирается из сохранённых разборов."""
+    if S.feedback or not S.results:
+        return
+    for c in S.calls:
+        if c["id"] in S.results:
+            auto_feedback(c, S.results[c["id"]])
+
+
 def _refresh():
     """Подхватить результаты, которые посчитал scripts/analyze_sales.py в отдельном процессе."""
     for path, attr in ((CACHE, "results"), (FEEDBACK, "feedback")):
@@ -190,6 +199,9 @@ class FeedbackIn(BaseModel):
     text: str
     call_id: str | None = None
     stage_id: str | None = None
+
+
+_seed_feedback()
 
 
 @router.get("/calls")
