@@ -115,6 +115,10 @@ textarea{width:100%;min-height:90px}.iss{color:var(--crit);font-size:12.5px}.okc
   <div class="panel"><h2>Команда: как каждый менеджер закрывает продажи <span class="ev">клик по строке — полный профиль</span></h2><div id="rteam"></div></div>
   <div class="panel" id="rprof-p" hidden><h2 id="rprof-h">Профиль</h2><div id="rprof"></div></div>
   <div class="two" style="display:grid;gap:12px">
+    <div class="panel"><h2>Споры менеджеров по разборам ИИ <span class="ev">поддержать — уйдёт РОП; отклонить — менеджер может обжаловать</span></h2><div id="rdisp"></div></div>
+    <div class="panel"><h2>Проверить разбор звонка <select id="rrevcall" onchange="revBox(this.value,'supervisor',$('rsup').value,'rrev')"></select></h2><div id="rrev" class="ev">Выберите звонок: можно оспорить вердикт ИИ и поставить свою оценку агрессии клиента</div></div>
+  </div>
+  <div class="two" style="display:grid;gap:12px">
     <div class="col"><div class="panel"><h2 id="rtitle">Срез</h2><div id="rview"></div></div><div class="panel"><h2>Разбор: где именно ошибка</h2><div id="rdrill" class="ev">Выберите этап, ячейку или слабое звено</div></div></div>
     <div class="col"><div class="panel"><h2>Возражения клиентов</h2><div id="robj"></div></div>
       <div class="panel"><h2>Обратная связь РОП менеджеру</h2>
@@ -128,6 +132,11 @@ textarea{width:100%;min-height:90px}.iss{color:var(--crit);font-size:12.5px}.okc
   <div class="panel"><h2>Сводка для РОП <span class="badge" id="rsname"></span></h2><div id="rshead" class="brief"></div></div>
   <div class="panel"><h2>Команды супервайзеров</h2><div id="rsteams"></div></div>
   <div class="two" style="display:grid;gap:12px"><div class="panel"><h2>Главные проблемы отдела</h2><div id="rstop"></div></div><div class="panel"><h2>Требуют внимания</h2><div id="rsatt"></div></div></div>
+  <div class="panel"><h2>Проверка вердиктов: финальное слово РОП <span class="badge" id="rsqn"></span></h2><div id="rsq"></div></div>
+  <div class="two" style="display:grid;gap:12px">
+    <div class="panel"><h2>Ручной ввод вердикта <select id="rsvcall" onchange="revBox(this.value,'rop',ROPN,'rsv')"></select></h2><div id="rsv" class="ev">Выберите звонок: решение РОП сразу меняет разбор и аналитику, а правило попадёт в следующие разборы ИИ</div></div>
+    <div class="panel"><h2>Насколько ИИ совпадает с людьми</h2><div id="rsmq"></div></div></div>
+  <div class="panel"><h2>Калибровка агрессии под оценки людей <span class="ev">люди оценивают по-разному — модель подгоняется под среднее</span></h2><div id="rscal"></div></div>
 </section>
 
 <section id="mgr" class="two">
@@ -137,7 +146,8 @@ textarea{width:100%;min-height:90px}.iss{color:var(--crit);font-size:12.5px}.okc
       <div id="mprt" class="badge"></div><div id="mprd" style="max-height:360px;overflow:auto;margin:6px 0"></div>
       <div class="row"><textarea id="mpri" placeholder="Твоя реплика клиенту… (Enter — отправить)" style="min-height:46px;flex:1"></textarea></div>
       <div class="row" style="margin-top:6px"><button class="pri" onclick="prSay()">Сказать</button><button class="ok" onclick="prFinish(this)">Завершить и получить разбор</button></div></div><div id="mprr"></div></div>
-    <div class="panel"><h2>Обратная связь мне</h2><div id="mfeed"></div></div><div class="panel"><h2>Звонок</h2><div id="mcall" class="ev">Выберите звонок</div></div></div>
+    <div class="panel"><h2>Обратная связь мне</h2><div id="mfeed"></div></div><div class="panel"><h2>Звонок</h2><div id="mcall" class="ev">Выберите звонок</div><div id="mrev"></div></div>
+    <div class="panel"><h2>Мои споры по разборам</h2><div id="mdisp"></div></div></div>
 </section>
 
 <section id="fin">
@@ -297,7 +307,7 @@ function ropDepOpen(i){const it=DEP.items[i];$('rdepd-p').hidden=false;$('rdepd-
    it.managers.map(m=>`<tr><td><b>${esc(m.manager)}</b><div class="ev">${m.calls} звонков</div></td><td>${Math.abs(m.value)}</td><td>${pc(Math.round(m.conversion*100))}</td><td>${Math.floor(m.talk.avg_duration_s/60)}:${String(m.talk.avg_duration_s%60).padStart(2,'0')}${m.talk.estimated?'<span class="ev">*</span>':''}</td>
    <td>${pc(Math.round(m.talk.manager_talk_share*100))}</td><td>${m.talk.open_questions_per_call}</td><td>${m.talk.longest_monologue_words}</td><td>${pc(m.style.composure)}</td><td>${pc(100-m.style.pressure)}</td><td>${pc(100-m.style.passivity)}</td><td class="ev">${esc(m.verdict)}</td><td><button onclick="ropProfile('${esc(m.manager)}')">Профиль</button></td></tr>`).join('')+
    '</table><div class="ev">Речь менеджера: норма для продажи 40–60%. * длительность оценена по числу слов (в демо нет аудио); на реальных записях — по таймкодам стерео.</div>';$('rdepd-p').scrollIntoView({behavior:'smooth'})}
-async function ropSum(){const R=await api('/api/sales/rop');$('rsname').textContent='РОП: '+R.rop;$('rshead').textContent=R.headline||'Нет данных';
+async function ropSum(){const R=await api('/api/sales/rop');ROPN=R.rop;$('rsname').textContent='РОП: '+R.rop;ropReview();$('rshead').textContent=R.headline||'Нет данных';
   $('rsteams').innerHTML='<table><tr><th>Супервайзер</th><th>Менеджеров</th><th>Звонков</th><th>Конверсия</th><th>Средний балл</th><th>Главная проблема команды</th><th>Назначено обучений</th><th>Обратной связи отправлено</th></tr>'+R.teams.map(t=>`<tr><td><b>${esc(t.supervisor)}</b></td><td>${t.managers}</td><td>${t.calls}</td><td>${pc(Math.round(t.conversion*100))}</td><td>${pc(t.avg_score)}</td><td>${esc(t.main_problem||'—')}</td><td>${t.trainings}</td><td>${t.feedback_sent}</td></tr>`).join('')+'</table>';
   $('rstop').innerHTML=R.top_problems.map(p=>`<div class="card"><b>${esc(p.title)}</b> <span class="badge">${p.value} ${esc(p.unit)}</span><div class="ev">слабее всех: ${esc(p.worst||'—')}</div></div>`).join('');
   $('rsatt').innerHTML=R.teams.flatMap(t=>t.attention.map(a=>`<div class="ev"><b>${esc(a.manager)}</b> (команда ${esc(t.supervisor)}): ${esc(a.why)}</div>`)).join('')||'<div class="ev">Нет</div>'}
@@ -323,7 +333,7 @@ async function ropLoad(){if(!$('rsup').options.length){const T=await api('/api/s
   $('fbmgr').innerHTML=RD.managers.map(m=>`<option>${esc(m)}</option>`).join('');$('fbcall').innerHTML+=RC.map(c=>`<option value="${c.id}">${c.id} · ${esc(c.manager)}</option>`).join('');
   $('rweak').innerHTML='<option value="">— выберите —</option>'+Object.entries(RD.funnel).sort((a,b)=>a[1].avg-b[1].avg).map(([k,v])=>`<option value="f:${k}">Воронка: ${esc(v.name)} — ${v.avg}%, ошибки в ${Math.round(v.fail_share*100)}% звонков</option>`).join('')+RD.weak_links.map((w,i)=>`<option value="w:${i}">${w.dimension==='менеджер'?'Менеджер':'Скрипт'} «${esc(w.who)}» — ${esc(w.stage)} ${w.score}%</option>`).join('');
   $('rmain').innerHTML=RD.calls_analyzed?`<b>Главное:</b> ${esc(RD.main_problem)} · разобрано звонков: ${RD.calls_analyzed} из ${RD.calls_total}`:'Звонки ещё не разобраны — нажмите «Разобрать новые звонки (ИИ)»';
-  ropRender();ropObj();ropFeed();ropTeam();ropDep()}
+  ropRender();ropObj();ropFeed();ropTeam();ropDep();ropDisp()}
 function ropRender(){const sl=$('rslice').value;if(!RD)return;
   if(sl==='funnel'){$('rtitle').textContent='Воронка: качество каждого этапа';const mx=100;
     $('rview').innerHTML='<table>'+RD.stages.filter(s=>RD.funnel[s.id]).map(s=>{const f=RD.funnel[s.id];return `<tr style="cursor:pointer" onclick="ropDrill('${s.id}')"><td>${esc(s.name)}</td><td style="width:45%"><div style="height:10px;border-radius:5px;background:${f.avg>=75?'var(--ok)':f.avg>=50?'var(--warn)':'var(--crit)'};width:${f.avg}%"></div></td><td>${pc(f.avg)}</td><td class="ev">ошибки в ${Math.round(f.fail_share*100)}% звонков</td></tr>`}).join('')+'</table><div class="ev">Нажмите на этап — откроются звонки с ошибками на нём</div>'}
@@ -342,9 +352,52 @@ async function mgrLoad(){const cs=await api('/api/sales/calls'),d0=await api('/a
   const m=$('mname').value,mine=cs.filter(c=>c.manager===m),me=d0.by_manager[m],team=d0.funnel;
   $('mstats').innerHTML=me?'<table><tr><th>Этап</th><th>Я</th><th>Команда</th></tr>'+d0.stages.filter(s=>me.stages[s.id]!=null).map(s=>`<tr><td>${esc(s.name)}</td><td>${pc(me.stages[s.id])}</td><td>${pc(team[s.id]?.avg)}</td></tr>`).join('')+`</table><div class="ev">Конверсия: ${Math.round(me.conversion*100)}% · звонков: ${me.calls}</div>`:'<div class="ev">Звонки ещё не разобраны</div>';
   $('mcalls').innerHTML=mine.map(c=>`<div class="card" style="cursor:pointer" onclick='mgrCall(${JSON.stringify(c.id)})'><div class="t"><b>${c.id}</b><span class="badge">${esc(c.script_name)}</span><span class="badge">${esc(c.outcome)}</span>${c.result?pc(c.result.total):'<span class="badge">не разобран</span>'}</div>${c.result?`<div class="ev">Зоны риска: ${c.result.risk_zones.map(z=>esc((d0.stages.find(s=>s.id===z)||{name:'тон'}).name)).join(', ')||'нет'}</div>`:''}</div>`).join('');
-  const fs=await api(`/api/sales/feedback?manager=${encodeURIComponent(m)}`);$('mfeed').innerHTML=fs.map(f=>fbHtml(f)+(f.status!=='прочитано'?`<button onclick="mgrRead('${f.id}')" style="margin:-2px 0 8px">Прочитал</button>`:'')).join('')||'<div class="ev">Обратной связи пока нет</div>';window.MC=cs}
+  const fs=await api(`/api/sales/feedback?manager=${encodeURIComponent(m)}`);$('mfeed').innerHTML=fs.map(f=>fbHtml(f)+`<div class="row" style="margin:-2px 0 8px">${f.status!=='прочитано'?`<button onclick="mgrRead('${f.id}')">Прочитал</button>`:''}${f.author!=='Тренажёр'&&f.kind!=='спор'?`<span class="ev">Полезно?</span><button onclick="useful('${f.id}',true,this)">👍</button><button onclick="useful('${f.id}',false,this)">👎</button>`:''}</div>`).join('')||'<div class="ev">Обратной связи пока нет</div>';window.MC=cs;
+  dispList(await api('/api/review/disputes?manager='+encodeURIComponent(m)),'mdisp','manager')}
+async function useful(id,u,btn){await api('/api/review/useful',{feedback_id:id,useful:u,who:$('mname').value});btn.parentElement.innerHTML='<span class="okc">✔ спасибо, учтём</span>'}
 async function mgrRead(id){await api(`/api/sales/feedback/${id}/read`,{});mgrLoad()}
-function mgrCall(id){const c=MC.find(x=>x.id===id),r=c.result;$('mcall').innerHTML=c.dialog.map(([ro,t])=>`<div class="m ${ro==='client'?'user':'assistant'}"><b>${ro==='client'?'Клиент':'Я'}:</b> ${esc(t)}</div>`).join('')+(r?`<div class="ev">Клиент: ${esc(r.client_state)} · итог: ${esc(r.outcome_reason)}</div><table>${r.stages.map(s=>`<tr><td><span class="sc sc${s.score}">${s.score}</span> ${esc(s.id)}</td><td class="ev">${s.mistake?'✘ '+esc(s.mistake)+(s.better?'<br>→ '+esc(s.better):''):'✔'}</td></tr>`).join('')}</table>${r.missed_signals.length?`<div class="iss">Пропущено: ${r.missed_signals.map(esc).join('; ')}</div>`:''}`:'')}
+function mgrCall(id){const c=MC.find(x=>x.id===id),r=c.result;$('mcall').innerHTML=c.dialog.map(([ro,t])=>`<div class="m ${ro==='client'?'user':'assistant'}"><b>${ro==='client'?'Клиент':'Я'}:</b> ${esc(t)}</div>`).join('')+(r?`<div class="ev">Клиент: ${esc(r.client_state)} · итог: ${esc(r.outcome_reason)}</div><table>${r.stages.map(s=>`<tr><td><span class="sc sc${s.score}">${s.score}</span> ${esc(s.id)}</td><td class="ev">${s.mistake?'✘ '+esc(s.mistake)+(s.better?'<br>→ '+esc(s.better):''):'✔'}</td></tr>`).join('')}</table>${r.missed_signals.length?`<div class="iss">Пропущено: ${r.missed_signals.map(esc).join('; ')}</div>`:''}`:'');$('mrev').innerHTML='';if(r)revBox(id,'manager',c.manager,'mrev')}
+
+/* ---- обратная связь на вердикты ИИ: споры, оценки агрессии, решения РОП ---- */
+let ROPN='РОП';const HL=['нет','колкость','пренебрежение','оскорбление / угроза'];
+const fv=(v,names)=>v==null?'—':names&&names[v]!=null?names[v]:String(v);
+async function revBox(cid,role,author,target){if(!cid)return;const R=await api(`/api/review/fields/${cid}?rater=${encodeURIComponent(author)}`),ch=R.client_hostility,el=$(target);
+  const ctl=(f,i)=>`<select id="${target}v${i}">${f.values.map(v=>`<option value="${v}" ${v==f.value?'selected':''}>${esc(fv(v,f.names))}</option>`).join('')}</select>`;
+  el.innerHTML=`<div class="card"><b>Враждебность клиента</b> <span class="ev">правила: ${ch.model} · калибровка по людям: ${ch.calibrated??'—'} → итог <b class="e${ch.final}">${ch.final} (${esc(HL[ch.final])})</b>, ${esc(ch.source)}</span>
+    <div class="row" style="margin-top:4px"><span class="ev">${role==='rop'?'Оценка РОП (эталон для калибровки):':'Ваша оценка — уйдёт в калибровку (среднее по всем):'}</span>${[0,1,2,3].map(v=>`<button class="${R.my_label===v?'pri':''}" onclick="revLabel('${cid}',${v},'${role}','${esc(author)}','${target}')">${v}</button>`).join('')}<span class="ev">оценили: ${R.labels.length}</span></div></div>
+   <details ${role==='rop'?'open':''}><summary class="ev" style="cursor:pointer">${role==='rop'?'Пункты разбора':'Не согласен с разбором? Оспорить пункт'}</summary><table><tr><th>Пункт разбора</th><th>ИИ</th><th>Сейчас</th><th>${role==='rop'?'Вердикт РОП':'Не согласен?'}</th></tr>${R.fields.map((f,i)=>`<tr><td>${esc(f.label)}</td><td>${esc(fv(f.model,f.names))}</td><td>${f.decision?`<b>${esc(fv(f.value,f.names))}</b><div class="ev">РОП${f.decision.comment?': '+esc(f.decision.comment):''}</div>`:esc(fv(f.value,f.names))}</td>
+    <td><div class="row">${ctl(f,i)}<input id="${target}c${i}" placeholder="${role==='rop'?'почему':'почему не согласен'}" style="flex:1;min-width:120px">${role==='rop'?`<input id="${target}r${i}" placeholder="правило на будущее (необязательно)" style="flex:1;min-width:140px"><button class="ok" onclick="revSend('${cid}','${f.field}',${i},'${role}','${esc(author)}','${target}')">Утвердить</button>`:`<button onclick="revSend('${cid}','${f.field}',${i},'${role}','${esc(author)}','${target}')">Оспорить</button>`}</div></td></tr>`).join('')}</table></details>
+   ${R.disputes.length?'<div class="ev" style="margin-top:6px">Споры по звонку:</div>'+R.disputes.map(d=>`<div class="ev">${d.id} · ${esc(d.label)}: ${esc(fv(d.current,d.names))} → ${esc(fv(d.proposed,d.names))} · <b>${esc(d.status_label)}</b></div>`).join(''):''}`}
+async function revLabel(cid,v,role,author,target){await api('/api/review/labels',{call_id:cid,rater:author,role,value:v});revBox(cid,role,author,target)}
+async function revSend(cid,field,i,role,author,target){const raw=$(target+'v'+i).value,val=/^\d+$/.test(raw)?+raw:raw,c=$(target+'c'+i).value;
+  try{if(role==='rop')await api('/api/review/verdict',{call_id:cid,field,value:val,comment:c,rule:$(target+'r'+i).value,author});
+  else await api('/api/review/disputes',{call_id:cid,field,proposed:val,comment:c,author,role})}catch(e){return alert(e.message)}
+  revBox(cid,role,author,target);if(role==='manager')mgrLoad();if(role==='rop')ropSum();if(role==='supervisor')ropDisp()}
+function dispCard(d,role,i){const hist=d.history.map(h=>`${tm(h.at)} ${esc(h.who)}: ${esc(h.action)}${h.comment?' — «'+esc(h.comment)+'»':''}`).join('<br>');
+  let act='';if(role==='manager'&&d.status==='rejected_sup'&&!d.appealed)act=`<button onclick="dispAct('${d.id}','appeal')">Обжаловать у РОП</button>`;
+  if(role==='supervisor'&&d.status==='supervisor')act=`<input id="dsc${i}" placeholder="комментарий" style="flex:1"><button class="ok" onclick="dispAct('${d.id}','support',${i})">Поддержать → РОП</button><button class="no" onclick="dispAct('${d.id}','reject',${i})">Отклонить</button>`;
+  if(role==='rop'&&d.status==='rop')act=`<select id="dsv${i}">${d.values.map(v=>`<option value="${v}" ${v==d.proposed?'selected':''}>${esc(fv(v,d.names))}</option>`).join('')}</select><input id="dsc${i}" placeholder="комментарий" style="flex:1;min-width:120px"><input id="dsr${i}" placeholder="правило на будущее (необязательно)" style="flex:1;min-width:160px"><button class="ok" onclick="dispAct('${d.id}','set',${i})">Утвердить</button><button class="no" onclick="dispAct('${d.id}','reject',${i})">Оставить ИИ</button>`;
+  return `<div class="card"><div class="t"><b>${d.call_id} · ${esc(d.manager)}</b><span class="badge">${esc(d.label)}</span><span>ИИ: <b>${esc(fv(d.current,d.names))}</b> → предлагает: <b>${esc(fv(d.proposed,d.names))}</b></span><span class="sev ${d.status==='accepted'?'ok':d.status.startsWith('rejected')?'critical':'warning'}">${esc(d.status_label)}</span></div>
+   ${d.comment?`<div class="brief">«${esc(d.comment)}» — ${esc(d.author)}, ${esc(d.role_label)}</div>`:''}<div class="ev">${hist}</div>${act?`<div class="row" style="margin-top:4px">${act}</div>`:''}</div>`}
+function dispList(ds,el,role){window['DS_'+role]=ds;$(el).innerHTML=ds.map((d,i)=>dispCard(d,role,i)).join('')||'<div class="ev">Споров нет</div>'}
+async function dispAct(id,a,i){try{if(a==='appeal')await api(`/api/review/disputes/${id}/appeal`,{});
+  else if(a==='support'||(a==='reject'&&$('rsup')&&document.querySelector('#rop.on')))await api(`/api/review/disputes/${id}/supervisor`,{decision:a,author:$('rsup').value,comment:$('dsc'+i).value});
+  else{const raw=a==='set'?$('dsv'+i).value:null;await api(`/api/review/disputes/${id}/rop`,{decision:a,value:raw==null?null:/^\d+$/.test(raw)?+raw:raw,comment:$('dsc'+i).value,rule:a==='set'?$('dsr'+i).value:'',author:ROPN})}}catch(e){return alert(e.message)}
+  if(document.querySelector('#mgr.on'))mgrLoad();if(document.querySelector('#rop.on'))ropDisp();if(document.querySelector('#ropsum.on'))ropSum()}
+async function ropDisp(){dispList(await api('/api/review/disputes?supervisor='+SUP()),'rdisp','supervisor');
+  $('rrevcall').innerHTML='<option value="">— звонок —</option>'+RC.filter(c=>c.result).map(c=>`<option value="${c.id}">${c.id} · ${esc(c.manager)} · ${esc(c.outcome)}</option>`).join('')}
+async function ropReview(){const q=await api('/api/review/disputes?status=rop');$('rsqn').textContent=q.length?`ждут решения: ${q.length}`:'очередь пуста';dispList(q,'rsq','rop');
+  const done=await api('/api/review/disputes?status=accepted,rejected');if(done.length)$('rsq').innerHTML+=`<details><summary class="ev">Решённые споры: ${done.length}</summary>${done.map((d,i)=>dispCard(d,'',i)).join('')}</details>`;
+  const cs=await api('/api/sales/calls');if($('rsvcall').options.length<2)$('rsvcall').innerHTML='<option value="">— звонок —</option>'+cs.filter(c=>c.result).map(c=>`<option value="${c.id}">${c.id} · ${esc(c.manager)} · ${esc(c.outcome)}</option>`).join('');
+  const Q=await api('/api/review/quality'),P=await api('/api/review/precedents');
+  $('rsmq').innerHTML=`<div class="row"><span class="badge">совпадение ИИ с РОП: ${Q.agreement==null?'нет проверок':Math.round(Q.agreement*100)+'%'}</span><span class="badge">споров: ${Q.disputes.total} · открыто ${Q.disputes.open} · принято ${Q.disputes.accepted} · отклонено ${Q.disputes.rejected}</span><span class="badge">обратная связь полезна: ${Q.feedback_useful.useful_share==null?'нет оценок':Math.round(Q.feedback_useful.useful_share*100)+'% из '+Q.feedback_useful.votes}</span></div>
+   <table><tr><th>Что проверял РОП</th><th>Проверено</th><th>ИИ прав</th></tr>${Q.by_field.map(x=>`<tr><td>${esc(x.field)}</td><td>${x.checked}</td><td>${pc(Math.round(x.agreement*100))}</td></tr>`).join('')||'<tr><td colspan=3 class="ev">Пока нет решений РОП</td></tr>'}</table>
+   <details><summary class="ev">Прецеденты РОП в промпте следующих разборов: ${Q.precedents}</summary><div class="brief">${esc(P.prompt||'пока нет')}</div></details>`;
+  const C=await api('/api/review/calibration');
+  $('rscal').innerHTML=C.fitted?`<div class="row"><span class="badge">звонков с оценками: ${C.n_calls} · оценок: ${C.n_labels}</span><span class="badge">ошибка правил: ${C.mae_rules}</span><span class="badge">ошибка после калибровки (честно, leave-one-out): ${C.mae_calibrated_loo}</span><span class="badge">точное попадание: ${Math.round(C.exact_rules*100)}% → ${Math.round(C.exact_calibrated_loo*100)}%</span></div>
+   <div class="two" style="display:grid;gap:10px;margin-top:6px"><div><b>Нужна оценка РОП</b> <span class="ev">люди сильно расходятся или правила далеко от людей</span>${C.contested.map(x=>`<div class="card"><div class="t"><b>${x.call_id} · ${esc(x.manager)}</b><span class="ev">правила ${x.rules} · люди ${x.human} (разброс ${x.spread}) · калибровка ${x.calibrated}</span><button onclick="$('rsvcall').value='${x.call_id}';revBox('${x.call_id}','rop',ROPN,'rsv')">Оценить</button></div><div class="ev">${Object.entries(x.ratings).map(([k,v])=>esc(k)+': '+v).join(' · ')}</div></div>`).join('')||'<div class="okc">Спорных нет</div>'}</div>
+   <div><b>Личная чувствительность к агрессии</b> <span class="ev">не оценка сотрудника: учитывается, когда человек оспаривает тон</span><table>${C.raters.map(r=>`<tr><td>${esc(r.rater)}</td><td>${r.bias>0?'+':''}${r.bias}</td><td class="ev">${esc(r.reading)}</td></tr>`).join('')}</table>
+   <div class="ev" style="margin-top:6px">Поправка к правилам по признакам: ${Object.entries(C.weights_named).filter(([k,v])=>v).map(([k,v])=>`${esc(k)} ${v>0?'+':''}${v}`).join(', ')}. Звук (перебивания, повышение голоса) включается на стереозаписях.</div></div></div>`:`<div class="ev">Мало оценок для калибровки: ${C.n_calls} звонков, нужно от 6</div>`}
 
 /* ---- экономика ---- */
 let FIN_OV={};const mln=n=>(n/1e6).toLocaleString('ru-RU',{maximumFractionDigits:1})+' млн';

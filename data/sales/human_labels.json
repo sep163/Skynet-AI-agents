@@ -1,0 +1,761 @@
+{
+"_note": "Демо-разметка калибровочной сессии: команда независимо оценила враждебность клиента 0–3 в каждом звонке. Люди оценивают по-разному — модель подгоняется под среднее, а не под одного человека.",
+"labels": [
+{
+"call_id": "S01",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S01",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S01",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S01",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S01",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S01",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S02",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S02",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S02",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S02",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S02",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S02",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S03",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S03",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S03",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S03",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S03",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S03",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S04",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S04",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S04",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S04",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S04",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S04",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S05",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S05",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S05",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S05",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S05",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S05",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S06",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S06",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S06",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S06",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S06",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S06",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S07",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S07",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S07",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S07",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S07",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S07",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S08",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S08",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 3,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S08",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S08",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S08",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S08",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S09",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S09",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S09",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S09",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S09",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S09",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S10",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S10",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S10",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S10",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S10",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S10",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S11",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S11",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S11",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S11",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S11",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S11",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S12",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S12",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S12",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S12",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S12",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S12",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S13",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 3,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S13",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 3,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S13",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S13",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S13",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S13",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S14",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S14",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 3,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S14",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S14",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S14",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S14",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 2,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S15",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S15",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S15",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S15",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S15",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S15",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S16",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S16",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S16",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S16",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S16",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S16",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S17",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S17",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S17",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S17",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S17",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S17",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S18",
+"rater": "Анна Котова",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S18",
+"rater": "Денис Мельников",
+"role": "manager",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S18",
+"rater": "Ирина Соловьёва",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S18",
+"rater": "Максим Гусев",
+"role": "manager",
+"value": 0,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S18",
+"rater": "Ольга Петрова",
+"role": "supervisor",
+"value": 1,
+"at": "2026-11-27T16:00"
+},
+{
+"call_id": "S18",
+"rater": "Сергей Ким",
+"role": "supervisor",
+"value": 0,
+"at": "2026-11-27T16:00"
+}
+]
+}

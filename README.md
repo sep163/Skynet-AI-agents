@@ -69,7 +69,7 @@ uvicorn app.main:app --port 8000
 ## Проверка
 
 ```bash
-python -m pytest -q                         # 23 теста без LLM, включая граф с поддельной моделью
+python -m pytest -q                         # 33 теста без LLM, включая граф с поддельной моделью
 python -m scripts.eval_sentinel --seeds 20  # Сентинел: recall 99%, всё раньше первой жалобы, 0 ложных
 python -m scripts.eval_cases comms          # фактчек рекламы: 7/7
 python -m scripts.eval_cases quality onboarding b2b   # на модели из .env

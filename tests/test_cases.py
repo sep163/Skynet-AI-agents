@@ -162,3 +162,80 @@ def test_practice_simulator_with_fake_llm(monkeypatch, tmp_path):
     assert r["client"] == "Ну ладно, давайте  завтра."
     f = sales.practice_finish(st["session"])
     assert f["result"]["total"] == 90 and any(x["kind"] == "тренировка" for x in sales.S.feedback if "kind" in x)
+
+
+def _review(monkeypatch, tmp_path):
+    sales = _fake_sales(monkeypatch, tmp_path)
+    from app.cases import review
+    monkeypatch.setattr(review, "PATH", tmp_path / "r.json")
+    review.reset()
+    sales.S.raw = dict(sales.S.results)
+    sales.rebuild()
+    return sales, review
+
+
+def test_dispute_flow_supervisor_rop_changes_analytics(monkeypatch, tmp_path):
+    sales, review = _review(monkeypatch, tmp_path)
+    assert sales.profile("Денис Мельников")["stages"]["needs"] == 0
+    cid = next(c["id"] for c in sales.S.calls if c["manager"] == "Денис Мельников")
+    d = review.dispute(review.DisputeIn(call_id=cid, field="stage:needs", proposed=2, comment="я задал два вопроса", author="Денис Мельников"))
+    assert d["status"] == "supervisor" and d["supervisor"] == "Ольга Петрова" and d["model_value"] == 0
+    d = review.supervisor_decide(d["id"], review.SupervisorIn(decision="reject", author="Ольга Петрова", comment="вопросов не было"))
+    assert d["status"] == "rejected_sup" and any(f.get("kind") == "спор" for f in sales.S.feedback)
+    d = review.appeal(d["id"], "прослушайте 0:40")
+    assert d["status"] == "rop"
+    with __import__("pytest").raises(Exception):
+        review.appeal(d["id"])
+    r = review.rop_decide(d["id"], review.RopIn(decision="set", value=1, comment="один вопрос был", rule="один открытый вопрос — это 1, не 0"))
+    assert r["dispute"]["status"] == "accepted" and sales.S.results[cid]["stages"][[s["id"] for s in sales.S.results[cid]["stages"]].index("needs")]["score"] == 1
+    assert sales.S.raw[cid]["stages"][0]["score"] in (0, 2)  # исходный разбор ИИ не тронут
+    assert "один открытый вопрос" in review.precedents_prompt(sales.S.calls[0]["script"])
+    q = review.model_quality()
+    assert q["disputes"]["accepted"] == 1 and q["agreement"] == 0.0
+
+
+def test_rop_manual_verdict_and_wrong_phrase(monkeypatch, tmp_path):
+    sales, review = _review(monkeypatch, tmp_path)
+    cid = next(c["id"] for c in sales.S.calls if c["manager"] == "Денис Мельников")
+    review.decide_verdict(review.VerdictIn(call_id=cid, field="wrong_phrase:0", value="not_error", comment="уместно"))
+    review.decide_verdict(review.VerdictIn(call_id=cid, field="close_type", value="no_next_step"))
+    assert sales.S.results[cid]["wrong_phrases"] == []
+    assert review.model_quality()["by_field"][1]["agreement"] == 1.0
+    import pytest
+    with pytest.raises(Exception):
+        review.decide_verdict(review.VerdictIn(call_id=cid, field="stage:needs", value=7))
+
+
+def test_aggression_calibration_follows_people(monkeypatch, tmp_path):
+    sales, review = _review(monkeypatch, tmp_path)
+    c = review.calibration()
+    assert c["fitted"] and c["n_calls"] >= 18
+    s13 = next(x for x in c["calls"] if x["call_id"] == "S13")
+    assert s13["rules"] == 0 and s13["human"] >= 2 and s13["calibrated"] >= 1.5  # «Вы там совсем охренели?» — люди видят враждебность
+    assert sales.S.results["S13"]["client_segment"] == "hostile"
+    assert next(r for r in c["raters"] if r["rater"] == "Денис Мельников")["reading"] == "строже среднего"
+    review.decide_verdict(review.VerdictIn(call_id="S13", field="client_hostility", value=1, comment="грубо, но не к менеджеру"))
+    assert sales.S.results["S13"]["client_hostility"] == {**sales.S.results["S13"]["client_hostility"], "final": 1, "source": "решение РОП"}
+    assert review.targets()["S13"]["weight"] == 3.0
+
+
+def test_acoustics_overlaps_and_raised_voice():
+    from app.cases import sales
+    u = [{"role": "client", "start": 0, "end": 4, "loudness_db": -30}, {"role": "operator", "start": 2.5, "end": 6, "loudness_db": -28},
+         {"role": "client", "start": 10, "end": 12, "loudness_db": -18}, {"role": "operator", "start": 12.5, "end": 14, "loudness_db": -29},
+         {"role": "client", "start": 14.5, "end": 16, "loudness_db": -31}]
+    a = sales.acoustics(u)
+    assert a["interruptions"] == {"manager": 1, "client": 0} and a["overlap_s"] == 1.5 and a["long_pauses"] == 1
+    assert a["raised_voice"]["client"] == 1 and a["manager_response_s"] == 0.5
+
+
+def test_precedents_reach_llm_prompt(monkeypatch, tmp_path):
+    sales, review = _review(monkeypatch, tmp_path)
+    cid = sales.S.calls[0]["id"]
+    review.decide_verdict(review.VerdictIn(call_id=cid, field="goal_result", value="partly", rule="запись без даты — цель достигнута частично"))
+    seen = {}
+    from app import llm
+    monkeypatch.setattr(llm, "complete_json", lambda sys, user, sch: seen.setdefault("sys", sys) and (_ for _ in ()).throw(RuntimeError("stop")))
+    with __import__("pytest").raises(RuntimeError):
+        sales.analyze(sales.S.calls[0])
+    assert "запись без даты" in seen["sys"]

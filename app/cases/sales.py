@@ -15,12 +15,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from .. import config, llm
-from . import quality
+from . import quality, review
 from .common import load, money_from, price_check
 
 router = APIRouter(prefix="/api/sales", tags=["sales"])
 CACHE = config.DATA / "sales" / "analysis_cache.json"
 FEEDBACK = config.DATA / "runtime" / "sales_feedback.json"
+UPLOADED = config.DATA / "runtime" / "sales_calls.json"
 SYSTEM = """Ты — опытный руководитель отдела продаж интернет-провайдера. Разбери звонок МЕНЕДЖЕРА (не клиента) по этапам продажи.
 Для каждого этапа: score 2 — сделано хорошо, 1 — частично, 0 — не сделано или сделано плохо; evidence — точная цитата менеджера или «нет»;
 mistake — в чём ошибка (пусто, если 2); better — как надо было сказать, одной готовой фразой.
@@ -54,8 +55,9 @@ TRAINING = {
 class State:
     def __init__(self):
         self.script = load("sales/script.json")
-        self.calls = load("sales/calls.json")
-        self.results = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
+        self.calls = load("sales/calls.json") + (json.loads(UPLOADED.read_text(encoding="utf-8")) if UPLOADED.exists() else [])
+        self.raw = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
+        self.results = dict(self.raw)  # эффективный разбор: ИИ + калибровка + решения РОП (см. rebuild)
         self.feedback = json.loads(FEEDBACK.read_text(encoding="utf-8")) if FEEDBACK.exists() else []
         self._ids = count(len(self.feedback) + 1)
         tariffs = load("onboarding/tariffs.json")
@@ -79,12 +81,26 @@ def _seed_feedback():
             auto_feedback(c, S.results[c["id"]])
 
 
+def rebuild():
+    """Разбор, который видят все роли: исходный разбор ИИ + калибровка агрессии под людей + решения РОП."""
+    calls = {c["id"]: c for c in S.calls}
+    S.results = {cid: review.apply(calls[cid], r) if cid in calls else r for cid, r in S.raw.items()}
+
+
 def _refresh():
-    """Подхватить результаты, которые посчитал scripts/analyze_sales.py в отдельном процессе."""
-    for path, attr in ((CACHE, "results"), (FEEDBACK, "feedback")):
+    """Подхватить результаты, которые посчитал scripts/analyze_sales.py в отдельном процессе, и решения по спорам."""
+    changed = False
+    for path, attr in ((CACHE, "raw"), (FEEDBACK, "feedback"), (review.PATH, None)):
         if path.exists() and _mt.get(path) != path.stat().st_mtime:
             _mt[path] = path.stat().st_mtime
-            setattr(S, attr, json.loads(path.read_text(encoding="utf-8")))
+            if attr:
+                setattr(S, attr, json.loads(path.read_text(encoding="utf-8")))
+            elif review.R is not None:
+                review.R.update(review._load())
+                review._cal["key"] = None
+            changed |= attr != "feedback"
+    if changed:
+        rebuild()
 
 
 def stage_ids(script_id):
@@ -132,7 +148,8 @@ def analyze(call: dict) -> dict:
     stages = [s for s in S.script["stages"] if s["id"] in sc["stages"]]
     crit = "\n".join(f"- {s['id']}: {s['name']} — {s['desc']}" for s in stages if s["id"] != "compliance")
     dialog = "\n".join(f"{'Клиент' if r == 'client' else 'Менеджер'}: {t}" for r, t in call["dialog"])
-    r = llm.complete_json(SYSTEM, f"Скрипт: {sc['name']}. Цель звонка: {sc['goal']}. Итог: {call['outcome']}.\nЭтапы:\n{crit}\n\nЗвонок:\n{dialog}", schema(call["script"]))
+    r = llm.complete_json(SYSTEM + review.precedents_prompt(call["script"]),
+                          f"Скрипт: {sc['name']}. Цель звонка: {sc['goal']}. Итог: {call['outcome']}.\nЭтапы:\n{crit}\n\nЗвонок:\n{dialog}", schema(call["script"]))
     got = {s["id"]: s for s in r["stages"]}
     r["stages"] = [got.get(i, {"id": i, "score": 0, "evidence": "нет", "mistake": "этап пропущен", "better": ""}) for i in stage_ids(call["script"])]
     if "compliance" in sc["stages"]:
@@ -151,12 +168,43 @@ def analyze(call: dict) -> dict:
     r["style_verdict"] = verdict(st)
     r["risk_zones"] = [s["id"] for s in r["stages"] if s["score"] == 0] + (["tone"] if st["composure"] == 0 else [])
     r["total"] = round(100 * sum(s["score"] for s in r["stages"]) / (2 * len(r["stages"])))
+    r["precedents_used"] = len(review.precedents(call["script"]))
     r["model"] = config.CLAUDE_MODEL if config.PROVIDER == "claude" else config.OLLAMA_MODEL
     r["analyzed_at"] = datetime.now().isoformat(timespec="minutes")
     return r
 
 
 OPEN_Q = r"\b(что|как|какой|какая|какие|каком|сколько|почему|зачем|для чего|расскажите|подскажите|чем|где|когда)\b[^?]*\?"
+
+
+def acoustics(u: list | None) -> dict:
+    """Звук разговора по стереозаписи с таймкодами: перебивания (наложение реплик), паузы, повышения голоса
+    относительно обычной громкости того же человека в этом звонке, пики в дБ."""
+    if not u:
+        return {}
+    u = sorted(u, key=lambda x: x["start"])
+    who = lambda x: "manager" if x["role"] in ("operator", "agent") else "client"
+    inter, overlap, pauses, resp = {"manager": 0, "client": 0}, 0.0, 0, []
+    for i, x in enumerate(u):
+        prev = [p for p in u[:i] if who(p) != who(x) and p["start"] < x["start"]]
+        talking = [p for p in prev if p["end"] - 0.3 > x["start"]]
+        if talking:
+            inter[who(x)] += 1
+            overlap += min(max(p["end"] for p in talking), x["end"]) - x["start"]
+        if i:
+            gap = x["start"] - max(p["end"] for p in u[:i])
+            pauses += gap > 3
+            if who(x) == "manager" and who(u[i - 1]) == "client" and gap > 0:
+                resp.append(gap)
+    loud, peak = {}, {}
+    for role in ("manager", "client"):
+        xs = [x["loudness_db"] for x in u if who(x) == role and x.get("loudness_db") is not None]
+        if xs:
+            med = sorted(xs)[len(xs) // 2]
+            loud[role] = sum(v > med + 6 for v in xs)
+            peak[role] = max(x.get("loudness_peak_db", x["loudness_db"]) for x in u if who(x) == role and x.get("loudness_db") is not None)
+    return {"interruptions": inter, "overlap_s": round(overlap, 1), "long_pauses": pauses, "raised_voice": loud, "peak_db": peak,
+            "manager_response_s": round(mean(resp), 1) if resp else None}
 
 
 def metrics(call: dict) -> dict:
@@ -175,7 +223,7 @@ def metrics(call: dict) -> dict:
     agent = [t for r, t in call["dialog"] if r == "agent"]
     return {"duration_s": round(dur), "manager_talk_share": round(share, 2), "manager_words": mw, "client_words": cw, "turns": len(call["dialog"]),
             "questions": sum(t.count("?") for t in agent), "open_questions": sum(len(re.findall(OPEN_Q, t, re.I)) for t in agent),
-            "longest_monologue_words": max((len(t.split()) for t in agent), default=0), "estimated": not u}
+            "longest_monologue_words": max((len(t.split()) for t in agent), default=0), "estimated": not u, "acoustics": acoustics(u)}
 
 
 def team_of(supervisor: str | None) -> set | None:
@@ -328,7 +376,7 @@ def rop_summary() -> dict:
 
 
 def _save():
-    CACHE.write_text(json.dumps(S.results, ensure_ascii=False, indent=1), encoding="utf-8")
+    CACHE.write_text(json.dumps(S.raw, ensure_ascii=False, indent=1), encoding="utf-8")
     FEEDBACK.parent.mkdir(parents=True, exist_ok=True)
     FEEDBACK.write_text(json.dumps(S.feedback, ensure_ascii=False, indent=1), encoding="utf-8")
 
@@ -349,7 +397,9 @@ def analyze_call(cid: str) -> dict:
         raise HTTPException(404)
     r = analyze(call)
     _refresh()
-    S.results[cid] = r
+    S.raw[cid] = r
+    rebuild()
+    r = S.results[cid]
     auto_feedback(call, r)
     _save()
     _mt.update({CACHE: CACHE.stat().st_mtime, FEEDBACK: FEEDBACK.stat().st_mtime})
@@ -388,10 +438,10 @@ def dashboard(manager: str | None = None, script: str | None = None, supervisor:
               for k, v in funnel.items()}
     weak = []
     for dim, mx in (("менеджер", matrix("manager")), ("скрипт", matrix("script"))):
-        for who, row in mx.items():
+        for name, row in mx.items():
             for sid, val in row["stages"].items():
                 if val < 60:
-                    weak.append({"dimension": dim, "who": who, "stage": names[sid], "stage_id": sid, "score": val})
+                    weak.append({"dimension": dim, "who": name, "stage": names[sid], "stage_id": sid, "score": val})
     weak.sort(key=lambda w: w["score"])
     obj = {}
     for c in calls:
@@ -406,6 +456,27 @@ def dashboard(manager: str | None = None, script: str | None = None, supervisor:
             "objections": {k: {**v, "handled_share": round(v["handled"] / v["count"], 2)} for k, v in obj.items()},
             "main_problem": f"Слабее всего этап «{weakest[1]['name']}»: {weakest[1]['avg']}% от нормы, ошибки в {round(weakest[1]['fail_share'] * 100)}% звонков" if weakest else None,
             "managers": sorted({c["manager"] for c in S.calls if who is None or c["manager"] in who}), "scripts": {k: v["name"] for k, v in S.script["scripts"].items()}}
+
+
+class CallIn(BaseModel):
+    manager: str
+    script: str
+    outcome: str = "без итога"
+    dialog: list
+    utterances: list | None = None
+
+
+def add_call(x: CallIn) -> dict:
+    """Реальный звонок: результат /api/transcribe_call (стерео → реплики с таймкодами и громкостью) + кто и по какому скрипту."""
+    if x.script not in S.script["scripts"]:
+        raise HTTPException(400, "нет такого скрипта")
+    ids = [c for c in S.calls if c["id"].startswith("R")]
+    c = {"id": f"R{len(ids) + 1:03d}", "manager": x.manager, "script": x.script, "date": datetime.now().date().isoformat(), "outcome": x.outcome,
+         "dialog": [list(d) for d in x.dialog], **({"utterances": x.utterances} if x.utterances else {})}
+    S.calls.append(c)
+    UPLOADED.parent.mkdir(parents=True, exist_ok=True)
+    UPLOADED.write_text(json.dumps([c for c in S.calls if c["id"].startswith("R")], ensure_ascii=False, indent=1), encoding="utf-8")
+    return c
 
 
 class AssignIn(BaseModel):
@@ -423,6 +494,7 @@ class FeedbackIn(BaseModel):
     stage_id: str | None = None
 
 
+rebuild()
 _seed_feedback()
 
 
@@ -430,6 +502,11 @@ _seed_feedback()
 def calls():
     _refresh()
     return [c | {"script_name": S.script["scripts"][c["script"]]["name"], "result": S.results.get(c["id"])} for c in S.calls]
+
+
+@router.post("/calls")
+def post_call(x: CallIn):
+    return add_call(x)
 
 
 @router.post("/calls/{cid}/analyze")
