@@ -1,8 +1,9 @@
 """A/B-тесты подходов менеджеров по типам клиентов.
 
 Тестируем не скрипт целиком (его выполняют частично и по-своему), а один подход для одного типа клиента:
-фразу или предложение в конкретной ситуации. Фразу заводит аналитик, супервайзер, РОП или менеджер (у менеджера —
-как предложение, запускает РОП).
+фразу или предложение в конкретной ситуации. Тест заводит и запускает только супервайзер или РОП:
+менеджер по продажам сам скрипт не меняет. Но если сильный менеджер придумал фразу, которая поднимает его продажи,
+система находит её по разборам его звонков, супервайзер проверяет её тестом, а победа засчитывается автору в рейтинг.
 
 - Деление: каждый менеджер работает в обоих вариантах, блоками по 2–3 дня (A → B или B → A, порядок случайный,
   половина отдела начинает с A). Так сильные и слабые менеджеры не перекашивают результат.
@@ -14,6 +15,7 @@
   Защитная метрика: клиент стал враждебен или менеджер давил. Смотрим один раз при наборе объёма."""
 import json
 import math
+from statistics import median
 import random
 import re
 from datetime import date, datetime, timedelta
@@ -37,7 +39,7 @@ DEMO_MANAGERS = ["Анна Котова", "Денис Мельников", "Ир
 
 def _load():
     d = json.loads(PATH.read_text(encoding="utf-8")) if PATH.exists() else {}
-    for k in ("experiments", "events", "standards"):
+    for k in ("experiments", "events", "standards", "credits"):
         d.setdefault(k, [])
     return d
 
@@ -52,7 +54,7 @@ def _save():
 
 def reset(data=None):
     global X
-    X = data or {"experiments": [], "events": [], "standards": []}
+    X = data or {"experiments": [], "events": [], "standards": [], "credits": []}
 
 
 # ---------- статистика ----------
@@ -336,11 +338,22 @@ class ExpIn(BaseModel):
     days: int = 6
     managers: list[str] | None = None
     author: str
-    role: str = "analyst"
+    role: str = "supervisor"
     hypothesis: str = ""
+    origin_manager: str | None = None
+    origin_calls: list[str] | None = None
+
+
+ROLES = {"supervisor": "супервайзер", "rop": "РОП"}
+
+
+def _role(role):
+    if role not in ROLES:
+        raise HTTPException(403, "заводят и запускают тесты супервайзер или РОП; фраза менеджера попадает в тест через «Находки менеджеров»")
 
 
 def create(x: ExpIn) -> dict:
+    _role(x.role)
     bad = [s for s in x.segments if s not in SEG]
     if bad or not x.segments:
         raise HTTPException(400, f"тип клиента: {list(SEG)}")
@@ -350,34 +363,49 @@ def create(x: ExpIn) -> dict:
         raise HTTPException(400, "фраза слишком короткая, чтобы найти её в звонке: добавьте ключевые слова")
     from . import sales
     seg0 = SEG[x.segments[0]]
+    managers = x.managers or sorted({c["manager"] for c in sales.S.calls})
+    origin = None
+    if x.origin_manager:
+        el = eligibility(x.origin_manager)
+        if not el["eligible"]:
+            raise HTTPException(409, f"{x.origin_manager}: {el['why']}")
+        # автор и так говорит свою фразу в обоих вариантах — в тесте он бы размыл разницу, поэтому участвуют остальные
+        managers = [m for m in managers if m != x.origin_manager]
+        origin = {"manager": x.origin_manager, "calls": x.origin_calls or [], "eligibility": el}
     e = {"id": f"AB-{len(X['experiments']) + 1:03d}", "title": x.title, "hypothesis": x.hypothesis, "segments": x.segments, "trigger": x.trigger,
          "variants": {"A": {"text": x.a_text}, "B": {"phrase": x.b_phrase, "keywords": x.b_keywords}},
          "metric": x.metric or seg0["metric"], "baseline": seg0["baseline"], "min_effect": x.min_effect, "expected_adherence": x.expected_adherence,
-         "block_days": x.block_days, "days": x.days, "managers": x.managers or sorted({c["manager"] for c in sales.S.calls}),
-         "author": x.author, "role": x.role, "created": datetime.now().isoformat(timespec="minutes"),
-         "status": "proposed" if x.role == "manager" else "draft", "start": None}
+         "block_days": x.block_days, "days": x.days, "managers": managers, "origin": origin,
+         "author": x.author, "role": x.role, "created": datetime.now().isoformat(timespec="minutes"), "status": "draft", "start": None}
     X["experiments"].append(e)
     _save()
     return e
 
 
-def start(eid: str, day: str | None = None, author: str = "РОП") -> dict:
+def start(eid: str, day: str | None = None, author: str = "РОП", role: str = "rop") -> dict:
+    _role(role)
     e = _get(eid)
-    if e["status"] not in ("draft", "proposed"):
+    if e["status"] != "draft":
         raise HTTPException(409, "тест уже запущен или завершён")
     e.update(status="running", start=day or date.today().isoformat(), started_by=author)
     _save()
     return e
 
 
-def finish(eid: str, author: str = "РОП") -> dict:
+def finish(eid: str, author: str = "РОП", role: str = "rop") -> dict:
+    _role(role)
     e = _get(eid)
     r = analyze(e)
     e.update(status="finished", result={"status": r["status"], "verdict": r["verdict"], "itt": r["itt"], "phrase_effect": r["phrase_effect"]},
              finished_by=author, finished=datetime.now().isoformat(timespec="minutes"))
     if r["status"] == "b_wins":
         for s in e["segments"]:
-            X["standards"].append({"segment": s, "phrase": e["variants"]["B"]["phrase"], "exp": e["id"], "effect": r["itt"]["diff"], "at": e["finished"]})
+            X["standards"].append({"segment": s, "phrase": e["variants"]["B"]["phrase"], "exp": e["id"], "effect": r["itt"]["diff"], "at": e["finished"],
+                                   "author": (e.get("origin") or {}).get("manager")})
+        if e.get("origin"):
+            X["credits"].append({"manager": e["origin"]["manager"], "exp": e["id"], "phrase": e["variants"]["B"]["phrase"], "segments": e["segments"],
+                                 "effect": r["itt"]["diff"], "phrase_effect": r["phrase_effect"], "managers_tested": len(e["managers"]), "at": e["finished"],
+                                 "text": f"фраза стала стандартом для «{', '.join(SEG[s]['name'] for s in e['segments'])}»: {round(r['itt']['diff'] * 100, 1)} п.п. к итогу у других менеджеров"})
     _save()
     return e
 
@@ -387,6 +415,66 @@ def _get(eid):
     if not e:
         raise HTTPException(404, "нет такого теста")
     return e
+
+
+def eligibility(manager: str) -> dict:
+    """Чью фразу проверяем: у менеджера итог выше медианы отдела и достаточно разобранных звонков."""
+    from . import sales
+    profs = [p for p in sales.team() if p["calls"]]
+    me = next((p for p in profs if p["manager"] == manager), None)
+    if not me:
+        return {"eligible": False, "why": "нет разобранных звонков"}
+    med = median(p["conversion"] for p in profs)
+    ok = me["calls"] >= 3 and me["conversion"] >= med
+    why = (f"конверсия {round(me['conversion'] * 100)}% при медиане отдела {round(med * 100)}%, разобрано звонков: {me['calls']}"
+           + ("" if ok else " — нужно не ниже медианы и от 3 звонков"))
+    return {"eligible": ok, "why": why, "conversion": me["conversion"], "median": med, "calls": me["calls"]}
+
+
+STAGE_NAMES = {"needs": "выявление потребностей", "offer": "предложение", "objections": "ответ на возражение", "closing": "закрытие на следующий шаг"}
+
+
+def innovations(min_words: int = 5, per_manager: int = 3) -> list:
+    """Находки менеджеров: фразы, которые разбор отметил как сильные (этап на 2 из 2 или отработанное возражение)
+    в успешных звонках менеджера и которых нет у других менеджеров. Это кандидаты: что фраза работает,
+    а не просто совпала с удачным звонком, покажет только A/B-тест на других менеджерах."""
+    from . import sales
+    calls = [c for c in sales.S.calls if c["id"] in sales.S.results]
+    out = []
+    for m in sorted({c["manager"] for c in calls}):
+        el = eligibility(m)
+        mine = [c for c in calls if c["manager"] == m]
+        others = [c for c in calls if c["manager"] != m]
+        found = []
+        for c in mine:
+            r = sales.S.results[c["id"]]
+            if not success(c, r, "next_step") or any(st["id"] == "compliance" and st["score"] == 0 for st in r["stages"]):
+                continue  # фраза с неверной ценой или запрещённым обещанием в стандарт не идёт
+            agent = [t for ro, t in c["dialog"] if ro == "agent"]
+            strong = [(st["evidence"], STAGE_NAMES[st["id"]]) for st in r["stages"] if st["id"] in STAGE_NAMES and st["score"] == 2 and st.get("evidence")]
+            for o in r.get("objections", []):
+                if o.get("handled"):
+                    i = next((k for k, (ro, t) in enumerate(c["dialog"]) if ro == "client" and o["quote"][:20].lower() in t.lower()), None)
+                    nxt = next((t for ro, t in c["dialog"][i + 1:] if ro == "agent"), None) if i is not None else None
+                    if nxt:
+                        strong.append((nxt, f"ответ на «{o['quote'][:40]}»"))
+            for ev, why in strong:
+                t = next((a for a in agent if phrase_used({"dialog": [["agent", a]]}, ev)["used"] or ev[:30] in a), None)
+                if not t or len(set(_stems(t))) < min_words or any(phrase_used({"dialog": [["agent", f["phrase"]]]}, t)["used"] for f in found):
+                    continue
+                if any(phrase_used(o, t)["used"] for o in others):
+                    continue
+                uses = [x for x in mine if phrase_used(x, t)["used"]]
+                seg = segment(c, r, sales.S.script)
+                found.append({"manager": m, "phrase": t, "where": why, "segment": seg, "segment_name": SEG[seg]["name"], "calls": [x["id"] for x in uses],
+                              "wins": sum(success(x, sales.S.results[x["id"]], "next_step") for x in uses), "eligible": el["eligible"], "why": el["why"],
+                              "in_tests": any((e.get("origin") or {}).get("manager") == m and e["variants"]["B"]["phrase"] == t for e in X["experiments"])})
+        out += found[:per_manager]
+    return sorted(out, key=lambda x: (not x["eligible"], -x["wins"]))
+
+
+def credits(manager: str | None = None) -> list:
+    return [c for c in X["credits"] if not manager or c["manager"] == manager]
 
 
 def today(manager: str, day: str | None = None) -> list:
@@ -411,7 +499,7 @@ def seed_demo():
              "Клиент, который не хочет уходить, соглашается на решение, если слышит точный срок и видит, что его время ценят", 0.12),
             ("Годовая оплата вместо ухода", "leaving", "Давайте посчитаем годовую оплату: выйдет на 20% дешевле, а тариф останется тот же", 0.08,
              "Часть уходящих уходит из-за цены: годовая оплата снимает причину без смены тарифа", 0.10)):
-        e = create(ExpIn(title=title, segments=[seg], b_phrase=phrase, author="Аналитик", role="analyst", hypothesis=hyp, days=6, block_days=2, min_effect=mde,
+        e = create(ExpIn(title=title, segments=[seg], b_phrase=phrase, author="Ольга Петрова", role="supervisor", hypothesis=hyp, days=6, block_days=2, min_effect=mde,
                          managers=DEMO_MANAGERS))
         start(e["id"], "2026-11-23", "Азамат")
         simulate(e, 100, true_effect=eff)
@@ -424,6 +512,7 @@ def view(e):
 class StartIn(BaseModel):
     day: str | None = None
     author: str = "РОП"
+    role: str = "rop"
 
 
 class CrmIn(BaseModel):
@@ -452,6 +541,16 @@ def post_exp(x: ExpIn):
     return create(x)
 
 
+@router.get("/innovations")
+def get_innovations():
+    return innovations()
+
+
+@router.get("/credits")
+def get_credits(manager: str | None = None):
+    return credits(manager)
+
+
 @router.get("/today")
 def get_today(manager: str, day: str | None = None):
     return today(manager, day)
@@ -465,12 +564,12 @@ def get_exp(eid: str):
 
 @router.post("/{eid}/start")
 def post_start(eid: str, x: StartIn):
-    return start(eid, x.day, x.author)
+    return start(eid, x.day, x.author, x.role)
 
 
 @router.post("/{eid}/finish")
 def post_finish(eid: str, x: StartIn):
-    return finish(eid, x.author)
+    return finish(eid, x.author, x.role)
 
 
 @router.post("/{eid}/simulate")

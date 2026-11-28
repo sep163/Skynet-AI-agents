@@ -252,7 +252,11 @@ def test_ab_schedule_crossover_and_today(monkeypatch, tmp_path):
     E = _exps(monkeypatch, tmp_path)
     e = E.create(E.ExpIn(title="t", segments=["tech_loyal"], b_phrase="мастер будет завтра с 10 до 12", author="a", managers=E.DEMO_MANAGERS))
     assert e["status"] == "draft"
-    assert E.create(E.ExpIn(title="m", segments=["price"], b_phrase="посчитаем годовую оплату", author="Денис", role="manager"))["status"] == "proposed"
+    import pytest
+    with pytest.raises(Exception):
+        E.create(E.ExpIn(title="m", segments=["price"], b_phrase="посчитаем годовую оплату", author="Денис", role="manager"))
+    with pytest.raises(Exception):
+        E.start(e["id"], "2026-11-23", "Денис", role="manager")
     E.start(e["id"], "2026-11-23")
     sc = E.schedule(e)
     starts = [r["arms"][0] for r in sc["rows"]]
@@ -312,3 +316,28 @@ def test_ab_ingest_from_analysis(monkeypatch, tmp_path):
     ev = E.ingest_call(c, sales.S.results["S01"], sales.S.script)
     assert ev and ev[0]["applied"] and ev[0]["success"] and ev[0]["segment"] == "new" and ev[0]["source"] == "разбор звонка"
     assert E.ingest_call(c, sales.S.results["S01"]) and len([x for x in E.X["events"] if x["call_id"] == "S01"]) == 1
+
+
+def test_ab_manager_innovation_credit(monkeypatch, tmp_path):
+    sales = _fake_sales(monkeypatch, tmp_path)
+    E = _exps(monkeypatch, tmp_path)
+    for c in sales.S.calls:
+        r = sales.S.results[c["id"]]
+        agent = [t for ro, t in c["dialog"] if ro == "agent"]
+        for st in r["stages"]:
+            st["evidence"] = agent[min(2, len(agent) - 1)]
+    inn = E.innovations()
+    assert inn and all(x["manager"] != "Денис Мельников" or not x["eligible"] for x in inn)
+    x = next(i for i in inn if i["eligible"])
+    import pytest
+    with pytest.raises(Exception):
+        E.create(E.ExpIn(title="d", segments=["new"], b_phrase=x["phrase"], author="Ольга", origin_manager="Денис Мельников", managers=E.DEMO_MANAGERS))
+    e = E.create(E.ExpIn(title="t", segments=[x["segment"]], b_phrase=x["phrase"], author="Ольга Петрова", origin_manager=x["manager"], managers=E.DEMO_MANAGERS,
+                         min_effect=0.12))
+    assert x["manager"] not in e["managers"] and e["origin"]["eligibility"]["eligible"]
+    E.start(e["id"], "2026-11-23")
+    E.simulate(e, 100, true_effect=0.15)
+    E.finish(e["id"])
+    cr = E.credits(x["manager"])
+    assert cr and cr[0]["effect"] > 0 and E.X["standards"][0]["author"] == x["manager"]
+    assert sales.profile(x["manager"])["contributions"] == cr

@@ -302,7 +302,8 @@ def profile(manager: str) -> dict:
                          for c, r in zip(calls, R) for s in r["stages"] if s["score"] == 0][:12],
             "wrong_phrases": [{"call_id": c["id"], **w} for c, r in zip(calls, R) for w in r.get("wrong_phrases", [])][:10],
             "missed_signals": [{"call_id": c["id"], "signal": m} for c, r in zip(calls, R) for m in r.get("missed_signals", [])][:8],
-            "plan": plan, "assigned": [f for f in S.feedback if f["manager"] == manager and f.get("kind") == "обучение"]}
+            "plan": plan, "assigned": [f for f in S.feedback if f["manager"] == manager and f.get("kind") == "обучение"],
+            "contributions": experiments.credits(manager)}
 
 
 def team(supervisor: str | None = None) -> list:
