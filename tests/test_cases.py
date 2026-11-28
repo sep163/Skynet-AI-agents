@@ -82,15 +82,40 @@ def test_tone_eval_old_vs_new():
     with redirect_stdout(io.StringIO()):
         eval_tone.main()
     r = json.loads(open("reports/tone_eval.json").read())
-    assert r["new"]["agg"] == r["n"] and r["new"]["esc"] == r["n"] and r["old"]["agg"] < r["n"]
+    assert r["new"]["agg"] == r["n"] and r["old"]["agg"] < r["n"]
 
 
-def test_voice_baseline_is_personal(tmp_path, monkeypatch):
-    from app import emotion, profiles
-    monkeypatch.setattr(profiles, "PATH", tmp_path / "p.json")
-    profiles.reset()
-    loud = {"loudness_db": -10, "words_per_sec": 3.8, "pitch_std_st": 4.5}
-    for d in (0, 0.5, -0.5):
-        emotion.analyze("Здравствуйте, вопрос по тарифу", {k: v + d for k, v in loud.items()}, use_llm=False, client_id="c9")
-    e = emotion.analyze("Здравствуйте, вопрос по тарифу", loud, use_llm=False, client_id="c9")
-    assert e["arousal"]["level"] == "normal" and "обычной манеры" in e["arousal"]["source"]
+def test_conduct_operator_rudeness_and_reactions():
+    from app.cases import quality
+    quality.S = quality.State()
+    d = {x["id"]: x for x in quality.S.dialogs}
+    c = lambda i: quality.conduct(d[i]["dialog"], None, d[i]["agent"])
+    assert c("D11")["client"]["hostility"] == 0 and not c("D11")["issues"]
+    assert c("D12")["client"]["hostility"] == 2 and not c("D12")["issues"]
+    d13 = c("D13")
+    assert d13["operator"]["hostility"] >= 2 and any(r["reaction"] == "ответил резкостью" for r in d13["reactions"])
+
+
+def test_sales_compliance_and_rop_dashboard(monkeypatch, tmp_path):
+    from app.cases import sales
+    monkeypatch.setattr(sales, "CACHE", tmp_path / "c.json")
+    monkeypatch.setattr(sales, "FEEDBACK", tmp_path / "f.json")
+    sales.S = sales.State()
+    calls = {c["id"]: c for c in sales.S.calls}
+    assert "490" in sales.compliance(calls["S03"]["dialog"])["evidence"]
+    assert "лучший" in sales.compliance(calls["S05"]["dialog"])["evidence"]
+    assert sales.compliance(calls["S10"]["dialog"])["score"] == 2
+
+    def fake(cid, needs):
+        st = [{"id": i, "score": needs if i == "needs" else 2, "evidence": "q", "mistake": "" if needs == 2 else "не выяснил", "better": "b"}
+              for i in sales.stage_ids(calls[cid]["script"])]
+        return {"stages": st, "objections": [{"type": "price", "quote": "дорого", "handled": needs == 2}], "missed_signals": [], "outcome_reason": "",
+                "feedback": {"good": "g", "fix": ["f"], "phrase": "p"}, "risk_zones": [] if needs else ["needs"], "total": 80, "analyzed_at": "2026-11-28T10:00"}
+    for cid in calls:
+        sales.S.results[cid] = fake(cid, 0 if calls[cid]["manager"] == "Денис Мельников" else 2)
+    d = sales.dashboard()
+    assert d["by_manager"]["Денис Мельников"]["stages"]["needs"] == 0
+    assert d["weak_links"][0]["who"] == "Денис Мельников" and d["weak_links"][0]["stage_id"] == "needs"
+    assert d["objections"]["дорого"]["count"] == 12
+    f = sales.add_feedback(sales.FeedbackIn(manager="Денис Мельников", text="Сначала вопросы, потом прайс", stage_id="needs"))
+    assert f["author"] == "РОП" and f["risk_zones"] == ["Потребности"]

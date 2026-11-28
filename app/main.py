@@ -10,14 +10,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import agent, config, emotion, llm, ops as ops_mod, tracing, voice
-from .cases import b2b, comms, finmodel, onboarding, quality
+from .cases import b2b, comms, finmodel, onboarding, quality, sales
 from .cases.common import split_next
 from .network import FAULT_KINDS, PARENT, all_ports
 from .tools import _clean
 
 app = FastAPI(title="SkyNet AI: виджет для сайта + внутренний интерфейс")
 app.add_middleware(CORSMiddleware, allow_origins=os.getenv("WIDGET_ORIGINS", "*").split(","), allow_methods=["*"], allow_headers=["*"])
-for r in (onboarding.router, b2b.router, quality.router, comms.router, finmodel.router):
+for r in (onboarding.router, b2b.router, quality.router, comms.router, finmodel.router, sales.router):
     app.include_router(r)
 CONVERSATIONS: dict[str, dict] = {}
 
@@ -189,6 +189,17 @@ def transcribe(audio: UploadFile = File(...)):
     data = audio.file.read()
     suffix = "." + (audio.filename or "a.webm").rsplit(".", 1)[-1]
     return voice.transcribe(data, suffix)
+
+
+@app.post("/api/transcribe_call")
+def transcribe_call(audio: UploadFile = File(...), client_channel: str = "left"):
+    if not voice.available():
+        raise HTTPException(501, "локальная транскрибация не установлена: pip install -r requirements-voice.txt")
+    suffix = "." + (audio.filename or "a.wav").rsplit(".", 1)[-1]
+    r = voice.transcribe_call(audio.file.read(), suffix, client_channel)
+    if "error" in r:
+        raise HTTPException(400, r["error"])
+    return r
 
 
 @app.get("/")

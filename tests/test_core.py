@@ -59,12 +59,12 @@ def test_emotion_axes_manner_is_not_aggression():
     a = lambda t, v=None: emotion.analyze(t, v, use_llm=False)
     assert a("Подскажите тариф")["hostility"] == 0
     e = a("Бля, опять нихрена не работает", {"loudness_db": -10, "words_per_sec": 4, "pitch_std_st": 5})
-    assert e["manner"] == "rough" and e["hostility"] == 0 and not e["escalate"] and e["arousal"]["level"] == "high"
+    assert e["manner"] == "rough" and e["hostility"] == 0 and e["arousal"]["level"] == "high"
     q = a("Девушка, вы вообще головой думаете?", {"loudness_db": -28, "words_per_sec": 2, "pitch_std_st": 1})
     assert q["hostility"] == 2 and q["target"] == "employee" and "холодная" in q["summary"]
-    assert a("Иди ты на хрен со своими советами")["escalate"]
+    assert a("Иди ты на хрен со своими советами")["hostility"] == 3
     c = a("Я расторгну договор")
-    assert c["escalate"] and c["hostility"] == 0
+    assert c["churn_risk"] and c["hostility"] == 0
 
 
 def test_api_chat_with_mocked_llm(monkeypatch):

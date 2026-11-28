@@ -67,3 +67,32 @@ def transcribe(data: bytes, suffix: str = ".webm") -> dict:
     out["segments"] = [{"start": round(s.start, 1), "end": round(s.end, 1), "text": s.text.strip(),
                         **{k: v for k, v in prosody(audio[int(s.start * 16000):int(s.end * 16000)]).items() if k in ("loudness_db", "pitch_std_st")}} for s in segs]
     return out
+
+
+def transcribe_call(data: bytes, suffix: str = ".wav", client_channel: str = "left") -> dict:
+    """Стереозапись колл-центра: клиент и оператор в разных каналах. Каждый канал расшифровывается отдельно,
+    реплики сводятся по времени — роли известны без модели распознавания говорящих."""
+    from faster_whisper.audio import decode_audio
+    with tempfile.NamedTemporaryFile(suffix=suffix) as f:
+        f.write(data)
+        f.flush()
+        try:
+            left, right = decode_audio(f.name, split_stereo=True)
+        except Exception:
+            return {"error": "запись не стерео: разметьте реплики вручную строками «К:» и «О:»"}
+    if len(left) and float(np.corrcoef(left[: 16000 * 30], right[: 16000 * 30])[0, 1]) > 0.98:
+        return {"error": "каналы одинаковые (моно-запись): разметьте реплики вручную строками «К:» и «О:»"}
+    chans = {"client": left, "operator": right} if client_channel == "left" else {"client": right, "operator": left}
+    utt = []
+    for role, audio in chans.items():
+        segs, _ = _get().transcribe(audio, language="ru", vad_filter=True, beam_size=5)
+        for s in segs:
+            t = s.text.strip()
+            if not t:
+                continue
+            dur = max(s.end - s.start, 0.3)
+            utt.append({"role": role, "start": round(s.start, 1), "end": round(s.end, 1), "text": t, "words_per_sec": round(len(t.split()) / dur, 2),
+                        **prosody(audio[int(s.start * 16000):int(s.end * 16000)])})
+    utt.sort(key=lambda u: u["start"])
+    return {"utterances": utt, "dialog": [["client" if u["role"] == "client" else "agent", u["text"]] for u in utt],
+            "duration_s": round(len(left) / 16000, 1), "model": config.WHISPER_MODEL}

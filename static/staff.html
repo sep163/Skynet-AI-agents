@@ -39,6 +39,8 @@ textarea{width:100%;min-height:90px}.iss{color:var(--crit);font-size:12.5px}.okc
   <button class="tab" data-t="b2b">B2B запросы<span class="n" id="n-b2b" hidden></span></button>
   <button class="tab" data-t="qa">Качество</button>
   <button class="tab" data-t="comms">Коммуникации</button>
+  <button class="tab" data-t="rop">Продажи: РОП</button>
+  <button class="tab" data-t="mgr">Кабинет менеджера</button>
   <button class="tab" data-t="fin">Экономика</button>
   <button class="pri" onclick="demoStart()" style="margin-left:auto">▶ Демо-сценарий</button><span class="badge" id="model"></span><a class="badge" href="/site-demo.html" target="_blank">Сайт с виджетом ↗</a>
 </header>
@@ -101,6 +103,28 @@ textarea{width:100%;min-height:90px}.iss{color:var(--crit);font-size:12.5px}.okc
   </div>
 </section>
 
+<section id="rop">
+  <div class="panel"><h2>Звонки менеджеров по продажам: где теряем клиентов <span class="row"><button onclick="ropAnalyze(this)">Разобрать новые звонки (ИИ)</button></span></h2>
+    <div class="row">Срез: <select id="rslice" onchange="ropRender()"><option value="funnel">по этапам воронки</option><option value="manager">по менеджерам</option><option value="script">по скриптам</option></select>
+      Менеджер: <select id="rmgr" onchange="ropLoad()"><option value="">все</option></select> Скрипт: <select id="rscript" onchange="ropLoad()"><option value="">все</option></select>
+      Слабое звено: <select id="rweak" onchange="ropWeak()" style="max-width:420px"></select></div>
+    <div id="rmain" class="brief" style="margin-top:8px"></div></div>
+  <div class="two" style="display:grid;gap:12px">
+    <div class="col"><div class="panel"><h2 id="rtitle">Срез</h2><div id="rview"></div></div><div class="panel"><h2>Разбор: где именно ошибка</h2><div id="rdrill" class="ev">Выберите этап, ячейку или слабое звено</div></div></div>
+    <div class="col"><div class="panel"><h2>Возражения клиентов</h2><div id="robj"></div></div>
+      <div class="panel"><h2>Обратная связь РОП менеджеру</h2>
+        <div class="row"><select id="fbmgr"></select><select id="fbstage"><option value="">этап (необязательно)</option></select><select id="fbcall"><option value="">звонок (необязательно)</option></select></div>
+        <textarea id="fbtext" placeholder="Ваш комментарий дополнит автоматическую обратную связь ИИ" style="margin-top:6px"></textarea><div class="row" style="margin-top:6px"><button class="pri" onclick="ropSend()">Отправить менеджеру</button><span id="fbok" class="okc"></span></div></div>
+      <div class="panel"><h2>Лента обратной связи</h2><div id="rfeed"></div></div></div>
+  </div>
+</section>
+
+<section id="mgr" class="two">
+  <div class="col"><div class="panel"><h2>Кабинет менеджера <select id="mname" onchange="mgrLoad()"></select></h2><div id="mstats"></div></div>
+    <div class="panel"><h2>Мои звонки</h2><div id="mcalls"></div></div></div>
+  <div class="col"><div class="panel"><h2>Обратная связь мне</h2><div id="mfeed"></div></div><div class="panel"><h2>Звонок</h2><div id="mcall" class="ev">Выберите звонок</div></div></div>
+</section>
+
 <section id="fin">
   <div class="panel"><h2>Цикл тестирования гипотез</h2>
     <div class="row" style="gap:10px"><span class="badge">1 · Исследование: hh.ru, «Работа России», СПАРК, прайсы API</span>→<span class="badge">2 · Гипотеза по каждой функции</span>→<span class="badge">3 · Предпосылки доходов и расходов</span>→<span class="badge">4 · Финмодель</span>→<span class="badge">5 · Самые и наименее доходные функции</span>↺</div>
@@ -120,7 +144,7 @@ const KL={cable_degradation:'Деградация кабеля',speed_downgrade:
 const api=async(u,b)=>{const r=await fetch(u,{method:b?'POST':'GET',headers:b instanceof FormData?{}:{'Content-Type':'application/json'},body:b instanceof FormData?b:b?JSON.stringify(b):undefined});if(!r.ok)throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail);return r.json()};
 const tm=s=>s?String(s).replace('T',' ').slice(5,16):'',esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])),rub=n=>Number(n).toLocaleString('ru-RU')+' ₽';
 const busy=async(btn,f)=>{const t=btn.textContent;btn.disabled=true;btn.textContent='ИИ думает…';try{await f()}catch(e){alert(e.message)}btn.disabled=false;btn.textContent=t};
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,section').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.t).classList.add('on');({conv:loadConv,onb:loadOnb,b2b:loadB2b,qa:loadQa,comms:loadComms,fin:loadFin}[b.dataset.t]||(()=>{}))()});
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,section').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.t).classList.add('on');({conv:loadConv,onb:loadOnb,b2b:loadB2b,qa:loadQa,comms:loadComms,fin:loadFin,rop:ropLoad,mgr:mgrLoad}[b.dataset.t]||(()=>{}))()});
 
 /* ---- пульт сети ---- */
 async function load(){S=await api('/api/state');render()}
@@ -183,8 +207,8 @@ async function getInsights(btn){busy(btn,async()=>{const r=await api('/api/quali
   $('insights').innerHTML=`<div class="ev">По критериям: ${Object.entries(r.by_criterion).map(([k,v])=>`${esc(k)} ${v}%`).join(' · ')}<br>По сотрудникам: ${Object.entries(r.by_agent).map(([k,v])=>`${esc(k)} ${v}%`).join(' · ')}</div>`+
   r.solutions.map(s=>`<div class="card"><b>${esc(s.problem)}</b><div class="ev">✔ ${esc(s.universal_solution)}</div><div class="brief">«${esc(s.script)}»</div><div class="ev">✘ Нельзя: ${esc(s.anti_pattern)}</div></div>`).join('')})}
 const RES={closed:['ok','вопрос закрыт'],partly:['warning','закрыт частично'],open:['critical','вопрос не закрыт']};
-function emoChips(e){if(!e)return'';return `<span class="badge">манера: ${esc(e.manner_label||e.manner)}</span><span class="badge e${e.dissatisfaction}">недовольство ${e.dissatisfaction}/3</span><span class="badge e${e.hostility}">враждебность ${e.hostility}/3${e.hostility?' → '+esc(e.target_label||e.target):''}</span>${e.arousal?.level==='high'?'<span class="badge e2">на эмоциях</span>':''}${e.escalate?'<span class="sev critical">к оператору</span>':''}`}
-function qaHtml(r){const c=r.client||{},rs=RES[r.resolution];return `<div class="brief"><b>${r.total}%</b> · ${esc(r.summary)}</div>${rs?`<div class="row" style="margin:6px 0"><span class="sev ${rs[0]}">${rs[1]}</span><span class="ev">${esc(r.resolution_reason)}</span></div>`:''}${c.summary?`<div class="ev">Клиент: <b>${esc(c.summary)}</b> · манера ${esc(c.manner)} · недовольство ${c.dissatisfaction}/3 · враждебность ${c.hostility}/3${c.hostility?' → '+esc(c.target):''}${c.aggressive_flag?' · <b class="e3">метка «агрессивный»</b>':' · метки «агрессивный» нет'}</div>`:''}<table>${r.scores.map(s=>`<tr><td><span class="sc sc${s.score}">${s.score}</span> ${esc(s.name)}</td><td class="ev">«${esc(s.evidence)}»${s.score<2?'<br>→ '+esc(s.fix):''}</td></tr>`).join('')}</table><div class="ev">Как надо было: ${esc(r.better_reply)}</div>`}
+function emoChips(e){if(!e)return'';return `<span class="badge">манера: ${esc(e.manner_label||e.manner)}</span><span class="badge e${e.dissatisfaction}">недовольство ${e.dissatisfaction}/3</span><span class="badge e${e.hostility}">враждебность ${e.hostility}/3${e.hostility?' → '+esc(e.target_label||e.target):''}</span>${e.arousal?.level==='high'?'<span class="badge e2">на эмоциях</span>':''}${e.churn_risk?'<span class="badge e3">риск ухода</span>':''}`}
+function qaHtml(r){const c=r.client||{},rs=RES[r.resolution];return `<div class="brief"><b>${r.total}%</b> · ${esc(r.summary)}</div>${rs?`<div class="row" style="margin:6px 0"><span class="sev ${rs[0]}">${rs[1]}</span><span class="ev">${esc(r.resolution_reason)}</span></div>`:''}${c.summary?`<div class="ev">Клиент: <b>${esc(c.summary)}</b> · манера ${esc(c.manner)} · недовольство ${c.dissatisfaction}/3 · враждебность ${c.hostility}/3${c.hostility?' → '+esc(c.target):''}</div>`:''}<table>${r.scores.map(s=>`<tr><td><span class="sc sc${s.score}">${s.score}</span> ${esc(s.name)}</td><td class="ev">«${esc(s.evidence)}»${s.score<2?'<br>→ '+esc(s.fix):''}</td></tr>`).join('')}</table><div class="ev">Как надо было: ${esc(r.better_reply)}</div>`}
 async function scoreText(btn){busy(btn,async()=>{const r=await api('/api/quality/score',{text:$('qatext').value});$('qaresult').innerHTML=qaHtml(r.result)})}
 async function transcribeFile(inp){const fd=new FormData();fd.append('audio',inp.files[0],inp.files[0].name);$('qaresult').textContent='Расшифровываю локально…';
   try{const r=await api('/api/transcribe',fd);$('qatext').value='К: '+r.text;$('qaresult').textContent=`Готово (${r.duration_s} с). Разметьте реплики «К:» и «О:» и нажмите «Оценить».`}catch(e){$('qaresult').textContent=e.message}}
@@ -221,6 +245,38 @@ async function demoShow(){const s=DEMO[DI];$('demo-t').textContent=s.t;$('demo-d
   $('demo-next').disabled=true;try{await s.run()}catch(e){$('demo-x').innerHTML=`<div class="iss">Ошибка: ${esc(e.message)}</div>`}$('demo-next').disabled=false;$('demo-next').textContent=DI===DEMO.length-1?'Готово':'Далее →'}
 async function demoNext(){if(DI===DEMO.length-1)return demoStop();DI++;await demoShow()}
 function demoStop(){$('demo').hidden=true}
+
+/* ---- продажи: РОП и кабинет менеджера ---- */
+let RD=null,RC=null;const pc=v=>v==null?'':`<span class="sc ${v>=75?'sc2':v>=50?'sc1':'sc0'}" style="min-width:42px">${v}%</span>`;
+const fbHtml=f=>`<div class="card"><div class="t"><span class="badge">${f.author==='ИИ'?'🤖 ИИ, сразу после звонка':'👤 РОП'}</span><b>${esc(f.manager)}</b>${f.call_id?`<span class="badge">${f.call_id}</span>`:''}${(f.risk_zones||[]).map(z=>`<span class="badge e2">${esc(z)}</span>`).join('')}<span class="badge">${tm(f.at)} · ${esc(f.status)}</span></div>
+  ${f.text?`<div class="brief">${esc(f.text)}</div>`:''}${f.good?`<div class="ev">👍 ${esc(f.good)}</div>`:''}${(f.fix||[]).map(x=>`<div class="ev">→ ${esc(x)}</div>`).join('')}${f.phrase?`<div class="brief">«${esc(f.phrase)}»</div>`:''}</div>`;
+async function ropLoad(){RD=await api(`/api/sales/dashboard?manager=${encodeURIComponent($('rmgr').value)}&script=${$('rscript').value}`);RC=await api('/api/sales/calls');
+  if($('rmgr').options.length<2){$('rmgr').innerHTML+=RD.managers.map(m=>`<option>${esc(m)}</option>`).join('');$('rscript').innerHTML+=Object.entries(RD.scripts).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join('');
+    $('fbmgr').innerHTML=RD.managers.map(m=>`<option>${esc(m)}</option>`).join('');$('fbstage').innerHTML+=RD.stages.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');$('fbcall').innerHTML+=RC.map(c=>`<option value="${c.id}">${c.id} · ${esc(c.manager)}</option>`).join('')}
+  $('rweak').innerHTML='<option value="">— выберите —</option>'+Object.entries(RD.funnel).sort((a,b)=>a[1].avg-b[1].avg).map(([k,v])=>`<option value="f:${k}">Воронка: ${esc(v.name)} — ${v.avg}%, ошибки в ${Math.round(v.fail_share*100)}% звонков</option>`).join('')+RD.weak_links.map((w,i)=>`<option value="w:${i}">${w.dimension==='менеджер'?'Менеджер':'Скрипт'} «${esc(w.who)}» — ${esc(w.stage)} ${w.score}%</option>`).join('');
+  $('rmain').innerHTML=RD.calls_analyzed?`<b>Главное:</b> ${esc(RD.main_problem)} · разобрано звонков: ${RD.calls_analyzed} из ${RD.calls_total}`:'Звонки ещё не разобраны — нажмите «Разобрать новые звонки (ИИ)»';
+  ropRender();ropObj();ropFeed()}
+function ropRender(){const sl=$('rslice').value;if(!RD)return;
+  if(sl==='funnel'){$('rtitle').textContent='Воронка: качество каждого этапа';const mx=100;
+    $('rview').innerHTML='<table>'+RD.stages.filter(s=>RD.funnel[s.id]).map(s=>{const f=RD.funnel[s.id];return `<tr style="cursor:pointer" onclick="ropDrill('${s.id}')"><td>${esc(s.name)}</td><td style="width:45%"><div style="height:10px;border-radius:5px;background:${f.avg>=75?'var(--ok)':f.avg>=50?'var(--warn)':'var(--crit)'};width:${f.avg}%"></div></td><td>${pc(f.avg)}</td><td class="ev">ошибки в ${Math.round(f.fail_share*100)}% звонков</td></tr>`}).join('')+'</table><div class="ev">Нажмите на этап — откроются звонки с ошибками на нём</div>'}
+  else{const M=sl==='manager'?RD.by_manager:RD.by_script;$('rtitle').textContent=sl==='manager'?'Менеджер × этап':'Скрипт × этап';
+    $('rview').innerHTML='<table><tr><th></th>'+RD.stages.map(s=>`<th>${esc(s.name)}</th>`).join('')+'<th>Конверсия</th><th>Звонков</th></tr>'+Object.entries(M).map(([k,v])=>`<tr><td><b>${esc(k)}</b></td>${RD.stages.map(s=>`<td style="cursor:pointer" onclick="ropDrill('${s.id}','${sl}','${esc(k)}')">${pc(v.stages[s.id])}</td>`).join('')}<td>${Math.round(v.conversion*100)}%</td><td>${v.calls}</td></tr>`).join('')+'</table><div class="ev">Нажмите на ячейку — откроются ошибки</div>'}}
+function ropDrill(sid,dim,who){const f=RD.funnel[sid];if(!f)return;const sn=RD.scripts;
+  const rows=f.fails.filter(x=>!dim||(dim==='manager'?x.manager===who:x.script===who));
+  $('rdrill').innerHTML=`<b>${esc(f.name)}${who?' · '+esc(who):''}</b> — ${rows.length} звонков с ошибкой`+rows.map(x=>`<div class="card"><div class="t"><span class="sc sc${x.score}">${x.score}</span><b>${x.call_id} · ${esc(x.manager)}</b><span class="badge">${esc(x.script)}</span><button onclick="ropPrefill('${esc(x.manager)}','${sid}','${x.call_id}')">Дать обратную связь</button></div><div class="ev">«${esc(x.evidence)}»</div><div class="iss">✘ ${esc(x.mistake)}</div>${x.better?`<div class="okc">→ ${esc(x.better)}</div>`:''}</div>`).join('')}
+function ropWeak(){const v=$('rweak').value;if(!v)return;if(v.startsWith('f:'))return ropDrill(v.slice(2));const w=RD.weak_links[+v.slice(2)];ropDrill(w.stage_id,w.dimension==='менеджер'?'manager':'script',w.who)}
+function ropObj(){$('robj').innerHTML='<table><tr><th>Возражение</th><th>Сколько раз</th><th>Отработано</th></tr>'+Object.entries(RD.objections).sort((a,b)=>b[1].count-a[1].count).map(([k,v])=>`<tr><td>${esc(k)}<div class="ev">${v.examples.slice(0,2).map(e=>`${e.handled?'✔':'✘'} ${e.call_id} «${esc(e.quote)}»`).join('<br>')}</div></td><td>${v.count}</td><td>${pc(Math.round(v.handled_share*100))}</td></tr>`).join('')+'</table>'}
+async function ropFeed(){const fs=await api('/api/sales/feedback');$('rfeed').innerHTML=fs.slice(0,15).map(fbHtml).join('')||'<div class="ev">Пока пусто</div>'}
+function ropPrefill(m,sid,cid){$('fbmgr').value=m;$('fbstage').value=sid;$('fbcall').value=cid;$('fbtext').focus()}
+async function ropSend(){if(!$('fbtext').value.trim())return;await api('/api/sales/feedback',{manager:$('fbmgr').value,text:$('fbtext').value,stage_id:$('fbstage').value||null,call_id:$('fbcall').value||null});$('fbtext').value='';$('fbok').textContent='✔ отправлено менеджеру';setTimeout(()=>$('fbok').textContent='',2500);ropFeed()}
+async function ropAnalyze(btn){await busy(btn,async()=>{const cs=await api('/api/sales/calls');for(const c of cs.filter(c=>!c.result)){btn.textContent=`Разбираю ${c.id}…`;await api(`/api/sales/calls/${c.id}/analyze`,{})}});ropLoad()}
+async function mgrLoad(){const cs=await api('/api/sales/calls'),d0=await api('/api/sales/dashboard');if(!$('mname').options.length)$('mname').innerHTML=d0.managers.map(m=>`<option>${esc(m)}</option>`).join('');
+  const m=$('mname').value,mine=cs.filter(c=>c.manager===m),me=d0.by_manager[m],team=d0.funnel;
+  $('mstats').innerHTML=me?'<table><tr><th>Этап</th><th>Я</th><th>Команда</th></tr>'+d0.stages.filter(s=>me.stages[s.id]!=null).map(s=>`<tr><td>${esc(s.name)}</td><td>${pc(me.stages[s.id])}</td><td>${pc(team[s.id]?.avg)}</td></tr>`).join('')+`</table><div class="ev">Конверсия: ${Math.round(me.conversion*100)}% · звонков: ${me.calls}</div>`:'<div class="ev">Звонки ещё не разобраны</div>';
+  $('mcalls').innerHTML=mine.map(c=>`<div class="card" style="cursor:pointer" onclick='mgrCall(${JSON.stringify(c.id)})'><div class="t"><b>${c.id}</b><span class="badge">${esc(c.script_name)}</span><span class="badge">${esc(c.outcome)}</span>${c.result?pc(c.result.total):'<span class="badge">не разобран</span>'}</div>${c.result?`<div class="ev">Зоны риска: ${c.result.risk_zones.map(z=>esc((d0.stages.find(s=>s.id===z)||{name:'тон'}).name)).join(', ')||'нет'}</div>`:''}</div>`).join('');
+  const fs=await api(`/api/sales/feedback?manager=${encodeURIComponent(m)}`);$('mfeed').innerHTML=fs.map(f=>fbHtml(f)+(f.status!=='прочитано'?`<button onclick="mgrRead('${f.id}')" style="margin:-2px 0 8px">Прочитал</button>`:'')).join('')||'<div class="ev">Обратной связи пока нет</div>';window.MC=cs}
+async function mgrRead(id){await api(`/api/sales/feedback/${id}/read`,{});mgrLoad()}
+function mgrCall(id){const c=MC.find(x=>x.id===id),r=c.result;$('mcall').innerHTML=c.dialog.map(([ro,t])=>`<div class="m ${ro==='client'?'user':'assistant'}"><b>${ro==='client'?'Клиент':'Я'}:</b> ${esc(t)}</div>`).join('')+(r?`<div class="ev">Клиент: ${esc(r.client_state)} · итог: ${esc(r.outcome_reason)}</div><table>${r.stages.map(s=>`<tr><td><span class="sc sc${s.score}">${s.score}</span> ${esc(s.id)}</td><td class="ev">${s.mistake?'✘ '+esc(s.mistake)+(s.better?'<br>→ '+esc(s.better):''):'✔'}</td></tr>`).join('')}</table>${r.missed_signals.length?`<div class="iss">Пропущено: ${r.missed_signals.map(esc).join('; ')}</div>`:''}`:'')}
 
 /* ---- экономика ---- */
 let FIN_OV={};const mln=n=>(n/1e6).toLocaleString('ru-RU',{maximumFractionDigits:1})+' млн';

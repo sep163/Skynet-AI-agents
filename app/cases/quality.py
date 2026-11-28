@@ -47,8 +47,48 @@ def client_profile(dialog) -> dict:
     manner = "rough" if any(r["manner"] == "rough" for r in rs) else "formal" if all(r["manner"] == "formal" for r in rs) else "neutral"
     return {"manner": emotion.MANNER[manner], "dissatisfaction": max(r["dissatisfaction"] for r in rs), "hostility": top["hostility"],
             "target": emotion.TARGET[top["target"]], "churn_risk": any(r["churn_risk"] for r in rs),
-            "summary": emotion.summary(top["hostility"], max(r["dissatisfaction"] for r in rs), manner, "normal"),
-            "aggressive_flag": top["hostility"] >= 2}
+            "summary": emotion.summary(top["hostility"], max(r["dissatisfaction"] for r in rs), manner, "normal")}
+
+
+TEMPLATE = r"(приносим (свои )?извинения за доставленные неудобства|ваше обращение (очень )?важно|ожидайте|в порядке очереди|обратитесь (в|по)|звоните на другой номер|это не к нам)"
+
+
+def conduct(dialog: list, utterances: list | None = None, operator: str | None = None) -> dict:
+    """Разбор без LLM: реальное состояние клиента по каждой реплике, поведение сотрудника и его реакция
+    на недовольного или резкого клиента. Голос сотрудника — относительно его собственной нормы."""
+    feats = utterances or [None] * len(dialog)
+    rows = []
+    for (role, text), u in zip(dialog, feats):
+        v = {k: u[k] for k in ("loudness_db", "words_per_sec", "pitch_std_st") if u and u.get(k) is not None} or None
+        key = (f"op:{operator}" if role == "agent" else None) if operator else None
+        e = emotion.analyze(text, v, use_llm=False, client_id=key)
+        rows.append({"role": role, "text": text, "manner": e["manner"], "dissatisfaction": e["dissatisfaction"], "hostility": e["hostility"],
+                     "target": e["target"], "arousal": e["arousal"]["level"], "summary": e["summary"], "template": role == "agent" and bool(re.search(TEMPLATE, text, re.I))})
+    cl = [r for r in rows if r["role"] == "client"]
+    op = [r for r in rows if r["role"] == "agent"]
+    reactions = []
+    for i, r in enumerate(rows):
+        if r["role"] != "client" or (r["hostility"] < 2 and r["dissatisfaction"] < 2):
+            continue
+        nxt = next((x for x in rows[i + 1:] if x["role"] == "agent"), None)
+        if nxt:
+            kind = "ответил резкостью" if nxt["hostility"] >= 1 else "шаблонная отписка" if nxt["template"] else "спокойно и по делу"
+            reactions.append({"client": r["text"], "operator": nxt["text"], "client_state": r["summary"], "reaction": kind, "ok": kind == "спокойно и по делу"})
+    c_host = max((r["hostility"] for r in cl), default=0)
+    o_host = max((r["hostility"] for r in op), default=0)
+    issues = []
+    if o_host >= 1:
+        issues.append("оператор сам допускает резкость или пренебрежение")
+    if any(r["arousal"] == "high" for r in op):
+        issues.append("оператор повышает голос относительно своей обычной манеры")
+    if any(not x["ok"] for x in reactions):
+        issues.append("на недовольство клиента ответил не по делу")
+    return {"utterances": rows, "client": {"manner": emotion.MANNER["rough" if any(r["manner"] == "rough" for r in cl) else "neutral"],
+                                           "dissatisfaction": max((r["dissatisfaction"] for r in cl), default=0), "hostility": c_host,
+                                           "summary": emotion.summary(c_host, max((r["dissatisfaction"] for r in cl), default=0),
+                                                                      "rough" if any(r["manner"] == "rough" for r in cl) else "neutral", "normal")},
+            "operator": {"name": operator, "hostility": o_host, "templates": sum(r["template"] for r in op), "raised_voice": any(r["arousal"] == "high" for r in op)},
+            "reactions": reactions, "issues": issues}
 
 
 def render(dialog):
@@ -66,13 +106,14 @@ def parse_text(text: str):
     return out
 
 
-def score(dialog: list) -> dict:
+def score(dialog: list, operator: str | None = None, utterances: list | None = None) -> dict:
     crit = "\n".join(f"- {c['id']}: {c['name']} — {c['desc']}" for c in S.checklist)
     r = llm.complete_json(SYSTEM, f"Чек-лист:\n{crit}\n\nДиалог:\n{render(dialog)}", schema())
     got = {s["id"]: s for s in r["scores"]}
     r["scores"] = [{**got.get(c["id"], {"id": c["id"], "score": 0, "evidence": "не оценено", "fix": ""}), "name": c["name"]} for c in S.checklist]
     r["total"] = round(100 * sum(s["score"] for s in r["scores"]) / (2 * len(S.checklist)))
     r["client"] = client_profile(dialog)
+    r["conduct"] = conduct(dialog, utterances, operator)
     return r
 
 
@@ -112,11 +153,45 @@ def insights() -> dict:
 class DialogIn(BaseModel):
     text: str | None = None
     dialog: list[list[str]] | None = None
+    utterances: list[dict] | None = None
+    operator: str | None = None
+
+
+def operators() -> dict:
+    """Сводка для РОП по каждому оператору: без LLM по всем диалогам, плюс итог чек-листа там, где ИИ уже оценил."""
+    by = {}
+    for d in S.dialogs:
+        c = conduct(d["dialog"], None, d["agent"])
+        o = by.setdefault(d["agent"], {"dialogs": 0, "scores": [], "closed": 0, "scored": 0, "own_rudeness": 0, "templates": 0,
+                                       "hard_clients": 0, "calm_reactions": 0, "issues": []})
+        o["dialogs"] += 1
+        o["own_rudeness"] += c["operator"]["hostility"] >= 1
+        o["templates"] += c["operator"]["templates"] > 0
+        o["hard_clients"] += len(c["reactions"])
+        o["calm_reactions"] += sum(x["ok"] for x in c["reactions"])
+        o["issues"] += [f"{d['id']}: {x}" for x in c["issues"]]
+        r = S.results.get(d["id"])
+        if r:
+            o["scored"] += 1
+            o["scores"].append(r["total"])
+            o["closed"] += r.get("resolution") == "closed"
+    for o in by.values():
+        o["avg_score"] = round(sum(o["scores"]) / len(o["scores"])) if o["scores"] else None
+        o["closed_share"] = round(o["closed"] / o["scored"], 2) if o["scored"] else None
+        o["calm_share"] = round(o["calm_reactions"] / o["hard_clients"], 2) if o["hard_clients"] else None
+        del o["scores"]
+    return by
 
 
 @router.get("/dialogs")
 def dialogs():
-    return {"checklist": S.checklist, "dialogs": [d | {"result": S.results.get(d["id"])} for d in S.dialogs], "agreement": agreement(S.results)}
+    return {"checklist": S.checklist, "agreement": agreement(S.results),
+            "dialogs": [d | {"result": S.results.get(d["id"]), "conduct": conduct(d["dialog"], None, d["agent"])} for d in S.dialogs]}
+
+
+@router.get("/operators")
+def get_operators():
+    return operators()
 
 
 @router.post("/score/{did}")
@@ -124,7 +199,7 @@ def score_one(did: str):
     d = next((d for d in S.dialogs if d["id"] == did), None)
     if not d:
         raise HTTPException(404)
-    S.results[did] = score(d["dialog"])
+    S.results[did] = score(d["dialog"], d["agent"])
     return {"result": S.results[did], "agreement": agreement(S.results)}
 
 
@@ -133,7 +208,16 @@ def score_custom(x: DialogIn):
     dialog = x.dialog or parse_text(x.text or "")
     if not dialog:
         raise HTTPException(400, "диалог пуст: строки вида «К: …» и «О: …»")
-    return {"dialog": dialog, "result": score(dialog)}
+    return {"dialog": dialog, "result": score(dialog, x.operator, x.utterances)}
+
+
+@router.post("/conduct")
+def conduct_only(x: DialogIn):
+    """Быстрый разбор без LLM: состояние клиента и поведение сотрудника."""
+    dialog = x.dialog or parse_text(x.text or "")
+    if not dialog:
+        raise HTTPException(400, "диалог пуст")
+    return conduct(dialog, x.utterances, x.operator)
 
 
 @router.post("/insights")

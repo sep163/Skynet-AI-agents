@@ -18,10 +18,7 @@ def answer(cid: str, history: list[dict], voice: dict | None = None) -> dict:
     o = ops_mod.get()
     last = next((m["content"] for m in reversed(history) if m["role"] == "user"), "")
     emo = emotion.analyze(last, voice, client_id=cid)
-    if emo["escalate"] and not any(a["type"] == "handoff" and a["client_id"] == cid and a["status"] == "pending" for a in o.actions):
-        o.handoff(cid, f"{emo['escalate_reason']}: {emo['reason']}", last[:300], priority="critical")
     system = (f"{ROLE}\n\n{_playbooks()}\n\n# Контекст\nСейчас {o.net.t:%d.%m.%Y %H:%M}. Клиент: {cid}.\n"
-              f"Состояние клиента: {emo['summary']} (манера: {emo['manner_label']}, недовольство {emo['dissatisfaction']}/3, враждебность {emo['hostility']}/3). {emo['tone_hint']}"
-              + (" Оператор уже уведомлён — скажи, что подключается старший специалист." if emo["escalate"] else ""))
+              f"Состояние клиента: {emo['summary']} (манера: {emo['manner_label']}, недовольство {emo['dissatisfaction']}/3, враждебность {emo['hostility']}/3). {emo['tone_hint']}")
     text, trace, guard = guarded_run("support", system, history, support_tools(o, cid))
     return {"answer": text, "trace": trace, "emotion": emo, "guard": guard}

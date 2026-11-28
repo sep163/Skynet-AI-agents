@@ -3,13 +3,11 @@
  "llm": false,
  "old": {
   "agg": 5,
-  "esc": 12,
   "fp": 7,
   "fn": 6
  },
  "new": {
   "agg": 18,
-  "esc": 18,
   "fp": 0,
   "fn": 0
  }
