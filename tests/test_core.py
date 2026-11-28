@@ -55,11 +55,16 @@ def test_policy_auto_vs_approval():
     assert o.request_visit("c003", "нет линка")["status"] == "ждёт подтверждения диспетчера"
 
 
-def test_emotion_rules():
-    assert emotion.analyze("Подскажите тариф", use_llm=False)["level"] == 0
-    assert emotion.analyze("Опять не работает", use_llm=False)["level"] == 1
-    assert emotion.analyze("Я расторгну договор!", use_llm=False)["level"] == 3
-    assert emotion.analyze("Опять не работает", {"loudness_db": -10, "words_per_sec": 4}, use_llm=False)["level"] == 2
+def test_emotion_axes_manner_is_not_aggression():
+    a = lambda t, v=None: emotion.analyze(t, v, use_llm=False)
+    assert a("Подскажите тариф")["hostility"] == 0
+    e = a("Бля, опять нихрена не работает", {"loudness_db": -10, "words_per_sec": 4, "pitch_std_st": 5})
+    assert e["manner"] == "rough" and e["hostility"] == 0 and not e["escalate"] and e["arousal"]["level"] == "high"
+    q = a("Девушка, вы вообще головой думаете?", {"loudness_db": -28, "words_per_sec": 2, "pitch_std_st": 1})
+    assert q["hostility"] == 2 and q["target"] == "employee" and "холодная" in q["summary"]
+    assert a("Иди ты на хрен со своими советами")["escalate"]
+    c = a("Я расторгну договор")
+    assert c["escalate"] and c["hostility"] == 0
 
 
 def test_api_chat_with_mocked_llm(monkeypatch):

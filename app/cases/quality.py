@@ -13,7 +13,9 @@ from .common import load
 router = APIRouter(prefix="/api/quality", tags=["quality"])
 SYSTEM = """Ты — эксперт по качеству клиентского сервиса интернет-провайдера. Оцени ответы СОТРУДНИКА (не клиента) по каждому критерию чек-листа:
 2 — сделано хорошо, 1 — частично, 0 — не сделано или сделано плохо. evidence — короткая точная цитата сотрудника (или «нет»), fix — что конкретно надо было сказать иначе (одной фразой).
-summary — 1–2 предложения: главное, что повлияло на впечатление клиента. better_reply — как надо было ответить в самый слабый момент диалога. Пиши по-русски."""
+summary — 1–2 предложения: главное, что повлияло на впечатление клиента. better_reply — как надо было ответить в самый слабый момент диалога.
+resolution — итог для клиента: closed (вопрос решён или есть конкретный срок и следующий шаг), partly (решено частично или нет срока), open (не решён, клиента отправили «позже» или «в другой отдел»).
+Оценивай тон СОТРУДНИКА относительно реального состояния клиента: резкая или простая манера речи клиента — не агрессия и не повод отвечать холодно или делать замечания. Пиши по-русски."""
 
 
 class State:
@@ -31,8 +33,22 @@ def schema():
     item = {"type": "object", "properties": {"id": {"type": "string", "enum": ids}, "score": {"type": "integer", "enum": [0, 1, 2]},
                                              "evidence": {"type": "string"}, "fix": {"type": "string"}},
             "required": ["id", "score", "evidence", "fix"], "additionalProperties": False}
-    return {"type": "object", "properties": {"scores": {"type": "array", "items": item}, "summary": {"type": "string"}, "better_reply": {"type": "string"}},
-            "required": ["scores", "summary", "better_reply"], "additionalProperties": False}
+    return {"type": "object", "properties": {"scores": {"type": "array", "items": item}, "summary": {"type": "string"}, "better_reply": {"type": "string"},
+                                             "resolution": {"type": "string", "enum": ["closed", "partly", "open"]}, "resolution_reason": {"type": "string"}},
+            "required": ["scores", "summary", "better_reply", "resolution", "resolution_reason"], "additionalProperties": False}
+
+
+def client_profile(dialog) -> dict:
+    """Состояние клиента по всем его репликам: манера, пиковое недовольство, пиковая враждебность с адресатом."""
+    rs = [emotion.rules(t) for role, t in dialog if role == "client"]
+    if not rs:
+        return {}
+    top = max(rs, key=lambda r: r["hostility"])
+    manner = "rough" if any(r["manner"] == "rough" for r in rs) else "formal" if all(r["manner"] == "formal" for r in rs) else "neutral"
+    return {"manner": emotion.MANNER[manner], "dissatisfaction": max(r["dissatisfaction"] for r in rs), "hostility": top["hostility"],
+            "target": emotion.TARGET[top["target"]], "churn_risk": any(r["churn_risk"] for r in rs),
+            "summary": emotion.summary(top["hostility"], max(r["dissatisfaction"] for r in rs), manner, "normal"),
+            "aggressive_flag": top["hostility"] >= 2}
 
 
 def render(dialog):
@@ -56,7 +72,7 @@ def score(dialog: list) -> dict:
     got = {s["id"]: s for s in r["scores"]}
     r["scores"] = [{**got.get(c["id"], {"id": c["id"], "score": 0, "evidence": "не оценено", "fix": ""}), "name": c["name"]} for c in S.checklist]
     r["total"] = round(100 * sum(s["score"] for s in r["scores"]) / (2 * len(S.checklist)))
-    r["client_peak_emotion"] = max((emotion.rules(t)["level"] for role, t in dialog if role == "client"), default=0)
+    r["client"] = client_profile(dialog)
     return r
 
 

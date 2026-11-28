@@ -73,3 +73,24 @@ def test_price_check_ignores_speed_and_channels():
 def test_comms_does_not_merge_numbers():
     issues = comms.check("Для 3 1000 ₽ скидка. «Дом 1000» — 890 ₽ в месяц.", "post", "семьи")["issues"]
     assert [i["msg"] for i in issues if i["type"] == "unknown_price"] == ["цена 1000 ₽ не найдена в прайсе"]
+
+
+def test_tone_eval_old_vs_new():
+    import io
+    from contextlib import redirect_stdout
+    from scripts import eval_tone
+    with redirect_stdout(io.StringIO()):
+        eval_tone.main()
+    r = json.loads(open("reports/tone_eval.json").read())
+    assert r["new"]["agg"] == r["n"] and r["new"]["esc"] == r["n"] and r["old"]["agg"] < r["n"]
+
+
+def test_voice_baseline_is_personal(tmp_path, monkeypatch):
+    from app import emotion, profiles
+    monkeypatch.setattr(profiles, "PATH", tmp_path / "p.json")
+    profiles.reset()
+    loud = {"loudness_db": -10, "words_per_sec": 3.8, "pitch_std_st": 4.5}
+    for d in (0, 0.5, -0.5):
+        emotion.analyze("Здравствуйте, вопрос по тарифу", {k: v + d for k, v in loud.items()}, use_llm=False, client_id="c9")
+    e = emotion.analyze("Здравствуйте, вопрос по тарифу", loud, use_llm=False, client_id="c9")
+    assert e["arousal"]["level"] == "normal" and "обычной манеры" in e["arousal"]["source"]

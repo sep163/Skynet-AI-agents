@@ -167,7 +167,7 @@ def widget_chat(x: WidgetIn):
         return chat(ChatIn(client_id=x.client_id, messages=x.messages, voice=x.voice, sid=x.sid))
     with tracing.attributes(session_id=x.sid, tags=[x.mode]):
         res = (onboarding.answer if x.mode == "onboarding" else b2b.answer)(h)
-    res["emotion"] = emotion.analyze(h[-1]["content"], x.voice, use_llm=False) if h else None
+    res["emotion"] = emotion.analyze(h[-1]["content"], x.voice, use_llm=False, client_id=x.sid) if h else None
     log_conv(x.sid, x.mode, x.client_id, h, res)
     return res
 
