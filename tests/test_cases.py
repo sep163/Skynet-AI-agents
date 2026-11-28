@@ -116,6 +116,49 @@ def test_sales_compliance_and_rop_dashboard(monkeypatch, tmp_path):
     d = sales.dashboard()
     assert d["by_manager"]["Денис Мельников"]["stages"]["needs"] == 0
     assert d["weak_links"][0]["who"] == "Денис Мельников" and d["weak_links"][0]["stage_id"] == "needs"
-    assert d["objections"]["дорого"]["count"] == 12
+    assert d["objections"]["дорого"]["count"] == len(calls)
     f = sales.add_feedback(sales.FeedbackIn(manager="Денис Мельников", text="Сначала вопросы, потом прайс", stage_id="needs"))
-    assert f["author"] == "РОП" and f["risk_zones"] == ["Потребности"]
+    assert f["author"] == "Супервайзер" and f["risk_zones"] == ["Потребности"]
+
+
+def _fake_sales(monkeypatch, tmp_path):
+    from app.cases import sales
+    monkeypatch.setattr(sales, "CACHE", tmp_path / "c.json")
+    monkeypatch.setattr(sales, "FEEDBACK", tmp_path / "f.json")
+    sales.S = sales.State()
+    for c in sales.S.calls:
+        weak = c["manager"] == "Денис Мельников"
+        sales.S.results[c["id"]] = {
+            "stages": [{"id": i, "score": 0 if weak and i == "needs" else 2, "evidence": "q", "mistake": "m" if weak else "", "better": "b"} for i in sales.stage_ids(c["script"])],
+            "objections": [], "missed_signals": [], "outcome_reason": "", "feedback": {"good": "g", "fix": ["f"], "phrase": "p"},
+            "goal_result": "failed" if weak else "achieved", "close_type": "no_next_step" if weak else "deal",
+            "style": {"pressure": 2 if weak else 0, "passivity": 0, "composure": 0 if weak else 2}, "style_verdict": "calmer" if weak else "balanced",
+            "wrong_phrases": [{"quote": "ну дешевле нет", "why": "w", "better": "b"}] if weak else [], "client_segment": "calm",
+            "risk_zones": ["needs"] if weak else [], "total": 40 if weak else 90, "analyzed_at": "2026-11-28T10:00"}
+    return sales
+
+
+def test_three_levels_supervisor_and_rop(monkeypatch, tmp_path):
+    sales = _fake_sales(monkeypatch, tmp_path)
+    d = sales.department("Ольга Петрова")
+    assert {m["manager"] for it in d["items"] for m in it["managers"]} <= {"Анна Котова", "Денис Мельников"}
+    p = sales.profile("Денис Мельников")
+    assert p["verdict"] == "calmer" and p["plan"][0]["key"] == "calmer" and any(x["key"] == "needs" for x in p["plan"])
+    assert p["wrong_phrases"] and p["talk"]["manager_talk_share"] > 0
+    r = sales.rop_summary()
+    assert [t["supervisor"] for t in r["teams"]] == ["Ольга Петрова", "Сергей Ким"]
+    assert any(a["manager"] == "Денис Мельников" for a in r["teams"][0]["attention"])
+    a = sales.assign(sales.AssignIn(manager="Денис Мельников", key="calmer", author="Супервайзер Ольга Петрова"))
+    assert a["kind"] == "обучение" and sales.practice_list("Денис Мельников")["scenarios"][3]["assigned"]
+
+
+def test_practice_simulator_with_fake_llm(monkeypatch, tmp_path):
+    sales = _fake_sales(monkeypatch, tmp_path)
+    from app import llm
+    monkeypatch.setattr(llm, "complete", lambda s, u: "Клиент: Ну ладно, давайте 中文 завтра.")
+    monkeypatch.setattr(sales, "analyze", lambda call: sales.S.results["S01"] | {"analyzed_at": "x"})
+    st = sales.practice_start("Анна Котова", "hostile")
+    r = sales.practice_say(st["session"], "Понимаю, мастер будет сегодня с 18 до 20")
+    assert r["client"] == "Ну ладно, давайте  завтра."
+    f = sales.practice_finish(st["session"])
+    assert f["result"]["total"] == 90 and any(x["kind"] == "тренировка" for x in sales.S.feedback if "kind" in x)
